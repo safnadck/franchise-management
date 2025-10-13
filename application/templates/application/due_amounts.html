@@ -1,0 +1,114 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Due Amounts Report</title>
+  <link rel="stylesheet" href="{% static 'css/fee_report.css' %}" />
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+
+<body>
+  <header class="navbar">
+    <a href="{% url 'application:homepage' %}" class="navbar-left">
+      <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo" />
+    </a>
+    <div class="user-panel">
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
+      <div class="dropdown-menu">
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Receipt</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <main class="page-content">
+    <div class="register-wrapper">
+      <div class="left-buttons">
+        <a href="{% url 'application:fee_report' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+      <div class="right-buttons">
+        <form method="get" action="{% url 'application:due_amounts' %}">
+          <label for="months">Filter by months:</label>
+          <select id="months" name="months" style="margin-left: 10px;">
+            <option value="" {% if not selected_months %}selected{% endif %}>-- Select --</option>
+            <option value="-3" {% if selected_months == '-3' %}selected{% endif %}>Last 3 months</option>
+            <option value="-6" {% if selected_months == '-6' %}selected{% endif %}>Last 6 months</option>
+            <option value="3" {% if selected_months == '3' %}selected{% endif %}>Next 3 months</option>
+            <option value="6" {% if selected_months == '6' %}selected{% endif %}>Next 6 months</option>
+            <option value="12" {% if selected_months == '12' %}selected{% endif %}>Next 12 months</option>
+          </select>
+          <button type="submit" class="report-button" style="margin-left: 10px;">Filter</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat-box stat-total">
+        <span class="iconify stat-icon" data-icon="mdi:cash-multiple"></span>
+        <h2>₹{{ total_due }}</h2>
+        <p>Total Due Fees</p>
+      </div>
+
+      <div class="stat-box stat-pending">
+        <span class="iconify stat-icon" data-icon="mdi:clock-alert"></span>
+        <h2>₹{{ total_pending }}</h2>
+        <p>Pending Fees</p>
+      </div>
+
+      <div class="stat-box stat-received">
+        <span class="iconify stat-icon" data-icon="mdi:check-decagram"></span>
+        <h2>₹{{ total_received }}</h2>
+        <p>Received Fees</p>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const userPanel = document.querySelector('.user-panel');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+
+    userPanel.addEventListener('click', function (event) {
+      event.stopPropagation();
+      dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', function () {
+      dropdownMenu.style.display = 'none';
+    });
+  </script>
+</body>
+</html>

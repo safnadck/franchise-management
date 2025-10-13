@@ -46,6 +46,15 @@
           <span class="menu-text">Reciept</span>
         </a>
       </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+
+      
       <div class="menu-item">
         <a href="{% url 'application:homepage' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
@@ -66,8 +75,48 @@
             </div>
 </div>
        <div class="content">
-            <h2>Inactive Users</h2>
-            <p>Users who haven't logged in for the last 2 days (since {{ two_days_ago|date:"M d, Y H:i" }}).</p>
+
+            <form method="get" id="filter-form" style="margin-bottom: 20px;">
+            <label for="days-select">Select Minimum Days Inactive:</label>
+            <input type="number" name="days_min" id="days-select" value="{{ current_days_min }}" min="0" placeholder="2" style="margin-right: 10px;">
+                <label for="franchise-select">Select Franchise:</label>
+                <select name="franchise_id" id="franchise-select" style="margin-right: 10px;" onchange="this.form.submit()">
+                    <option value="">All Franchises</option>
+                    {% for franchise in all_franchises %}
+                    <option value="{{ franchise.id }}" {% if franchise.id|stringformat:"s" == current_franchise_id %}selected{% endif %}>{{ franchise.name }}</option>
+                    {% endfor %}
+                </select>
+            <label for="batch-select">Select Batch:</label>
+            <select name="batch_id" id="batch-select" style="margin-right: 10px;" {% if not current_franchise_id %}disabled{% endif %}>
+                <option value="">All Batches</option>
+                {% for batch in batches %}
+                <option value="{{ batch.id }}" {% if batch.id|stringformat:"s" == current_batch_id %}selected{% endif %}>{{ batch.batch_no }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="filter-button">Filter</button>
+        </form>
+        <script>
+          // Update batch options when franchise changes
+          document.getElementById('franchise-select').addEventListener('change', function() {
+            var franchiseId = this.value;
+            var batchSelect = document.getElementById('batch-select');
+            batchSelect.innerHTML = '<option value="">All Batches</option>';
+            batchSelect.disabled = true;
+            if (franchiseId) {
+              fetch('/application/get-batches/' + franchiseId + '/')
+                .then(response => response.json())
+                .then(data => {
+                  data.batches.forEach(function(batch) {
+                    var option = document.createElement('option');
+                    option.value = batch.id;
+                    option.textContent = batch.batch_no;
+                    batchSelect.appendChild(option);
+                  });
+                  batchSelect.disabled = false;
+                });
+            }
+          });
+        </script>
 
     <div class="table-wrapper">
       <table class="data-table">
@@ -111,8 +160,8 @@
               {% endif %}
             </td>
             <td>
-              {% if data.user.userfranchise.franchise %}
-                {{ data.user.userfranchise.franchise.name }}
+              {% if data.franchise %}
+                {{ data.franchise.name }}
               {% else %}
                 No Franchise
               {% endif %}
@@ -138,8 +187,7 @@
       <div class="pagination-wrapper">
         <div class="pagination">
           {% if users_page.has_previous %}
-            <a href="?page=1" class="pagination-link">&laquo; First</a>
-            <a href="?page={{ users_page.previous_page_number }}" class="pagination-link">&lsaquo; Previous</a>
+            <a href="?days_min={{ current_days_min }}&franchise_id={{ current_franchise_id }}&batch_id={{ current_batch_id }}&page={{ users_page.previous_page_number }}" class="pagination-link">&lsaquo; Previous</a>
           {% endif %}
 
           <span class="pagination-info">
@@ -147,8 +195,7 @@
           </span>
 
           {% if users_page.has_next %}
-            <a href="?page={{ users_page.next_page_number }}" class="pagination-link">Next &rsaquo;</a>
-            <a href="?page={{ users_page.paginator.num_pages }}" class="pagination-link">Last &raquo;</a>
+            <a href="?days_min={{ current_days_min }}&franchise_id={{ current_franchise_id }}&batch_id={{ current_batch_id }}&page={{ users_page.next_page_number }}" class="pagination-link">Next &rsaquo;</a>
           {% endif %}
         </div>
       </div>

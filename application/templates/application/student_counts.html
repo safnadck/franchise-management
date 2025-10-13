@@ -1,0 +1,111 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Counts</title>
+  <link rel="stylesheet" href="{% static 'css/student_counts.css' %}">
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+    </div>
+
+    <div class="user-panel">
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
+
+      <div class="dropdown-menu">
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Receipt</span>
+        </a>
+      </div>
+
+      <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="page-content">
+
+      <div class="register-wrapper">
+   <div class="left-buttons">
+        <a href="{% url 'application:homepage' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+  </div>
+
+  
+    <div class="student-counts">
+      {% for franchise in franchise_data %}
+        <div class="franchise-card">
+          <h2>Franchise: {{ franchise.name }}</h2>
+          <div class="total-students">
+            <strong>Total Students: {{ franchise.total_students }}</strong>
+          </div>
+          <div class="batch-list">
+            {% for batch in franchise.batches %}
+              <div class="batch-item">
+                <span class="batch-name">{{ batch.batch_no }}</span>
+                <span class="student-count">{{ batch.student_count }} students</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </main>
+
+  <script>
+    const userPanel = document.querySelector('.user-panel');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+
+    userPanel.addEventListener('click', function (event) {
+      event.stopPropagation();
+      dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    document.addEventListener('click', function () {
+      dropdownMenu.style.display = 'none';
+    });
+  </script>
+
+</body>
+
+</html>

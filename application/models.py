@@ -2,6 +2,14 @@ from django.db import models
 from django.contrib.auth.models import User
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
+
+class CourseFee(models.Model):
+    course = models.OneToOneField(CourseOverview, on_delete=models.CASCADE, related_name='fee')
+    fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"Fee for {self.course.display_name}: {self.fee}"
+
 class Franchise(models.Model):
     name = models.CharField(max_length=255)
     coordinator = models.CharField(max_length=255)
@@ -15,10 +23,13 @@ class Franchise(models.Model):
 
 
 class UserFranchise(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     franchise = models.ForeignKey(Franchise, on_delete=models.SET_NULL, null=True, blank=True)
     batch = models.ForeignKey("Batch", on_delete=models.SET_NULL, null=True, blank=True)
-    registration_number = models.CharField(max_length=20, unique=True, blank=True, null=True)
+    registration_number = models.CharField(max_length=20, blank=True, null=True)
+
+    class Meta:
+        unique_together = ('user', 'franchise', 'batch')
 
     def generate_registration_number(self):
         if not self.franchise or not self.batch:
@@ -82,11 +93,11 @@ class BatchFeeManagement(models.Model):
 class StudentFeeManagement(models.Model):
     user_franchise = models.OneToOneField(UserFranchise, on_delete=models.CASCADE, related_name='fee_management')
     batch_fee_management = models.ForeignKey(BatchFeeManagement, on_delete=models.CASCADE)
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     remaining_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     def save(self, *args, **kwargs):
-        if not self.remaining_amount:
-            self.remaining_amount = self.batch_fee_management.remaining_amount
+        self.remaining_amount = self.batch_fee_management.batch.fees - self.discount
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -127,3 +138,12 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment for Installment {self.installment.id}"
+
+
+class SpecialAccessUser(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='special_access')
+    granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='granted_accesses')
+    granted_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Special Access for {self.user.username}"

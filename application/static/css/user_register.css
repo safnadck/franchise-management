@@ -52,7 +52,8 @@ body {
   gap: 8px;
   font-size: 14px;
   margin-right: 20px;
-  cursor: pointer; /* shows pointer on hover */
+  cursor: pointer; 
+  margin-bottom: 1%;/* shows pointer on hover */
 }
 
 .dropdown-menu {
@@ -93,7 +94,7 @@ body {
 /* Sidebar */
 .sidebar-menu {
   position: fixed;
-  top: 118px;
+  top: 115px;
   left: 15px;
   width: 80px;
   height: calc(100vh - 70px);
@@ -181,11 +182,11 @@ body {
 
 .form-card {
   width: 100%;
-  height: 870px;
+  height: 800px;
   background-color: #16376D;
   border-radius: 12px;
   padding: 2.5rem;
-  margin: 3rem auto; 
+  margin: 3rem 0; 
   text-align: center;
   color: white;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);
@@ -230,8 +231,7 @@ body {
   color: rgba(255,255,255,0.7);
 }
 
-
-.form-card .button {
+.form-card button {
   margin-top: 2rem;
   padding: 14px 25px;
   border: none;
@@ -249,7 +249,7 @@ body {
   transition: background-position 0.5s ease, color 0.3s ease;
 }
 
-.form-card .button:hover {
+.form-card button:hover {
   background-position: bottom right;   
   color: #16376D;                      
 }
@@ -269,7 +269,7 @@ body {
     font-size: 16px;
 }
 
-
+/* Each course checkbox styled like input */
 .course-item {
     display: flex;
     align-items: center;
@@ -291,8 +291,9 @@ body {
     border-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Checkbox itself */
 .course-item input[type="checkbox"] {
-    accent-color: #ffde2b; 
+    accent-color: #ffde2b; /* makes checkbox match button gradient */
     width: 18px;
     height: 18px;
 }
@@ -332,49 +333,99 @@ body {
   background-color: #fff;
   border: 1px solid #16376D;
   color: #16376D;
-  padding: 8px 10px;
+  padding: 10px 20px;
   border-radius: 14px;
   text-decoration: none;
   font-size: 15px;
   font-weight: 600;
-  transition: background-color 0.3s e
+  transition: background-color 0.3s ease;
 }
 
-
-.courses-dropdown {
-    position: relative;
-    width: 100%;
+.register-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(120deg, #16376D 50%, rgba(255, 254, 39, 1) 50%);
+  background-size: 200% 200%;
+  background-position: top left;
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-size: 15px;
+  margin-bottom: -30px;
+  transition: background-position 0.5s ease, color 0.3s ease;
 }
 
-.dropdown-toggle {
-    width: 100%;
-      padding: 17px 15px;   
-    outline: none;
-    height: 55px;        
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 10px;
-    background-color: rgba(255, 255, 255, 0.04);
-   color: rgba(255,255,255,0.7);
-    font-size: 16px;  
-    text-align: left;
+.register-button:hover {
+  background-position: bottom right;
+  color: #16376D;
 }
 
-.dropdown-content {
-  text-align: left;
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    width: 100%;
-    margin-top: 5px;
-    background-color: rgba(22, 55, 109, 0.98);
-    border-radius: 10px;
-    padding: 10px;
-    max-height: 250px;
-    overflow-y: auto;
-    z-index: 1000;
+.plus-icon {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
 }
 
-.courses-dropdown.active .dropdown-content {
-    display: block;
+/* Password container for eye icon */
+.password-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-container input {
+  flex: 1;
+  padding-right: 40px; /* space for icon */
+}
+
+.eye-icon {
+  position: absolute;
+  right: 15px;
+  cursor: pointer;
+  color: rgba(255,255,255,0.7);
+  font-size: 20px;
+  transition: color 0.2s ease;
+}
+
+.eye-icon:hover {
+  color: #fff;
+}
+
+/* Default form width for small screens */
+.form-card form {
+  width: 90%;         /* nearly full width on mobile */
+  max-width: 400px;   /* prevent it from growing too big */
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+ margin-top: 5%;
+}
+
+/* Make inputs and selects fill form width */
+.form-card input,
+.form-card select {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Tablets and laptops (768px - 1838px) */
+@media (min-width: 768px) and (max-width: 1838px) {
+  .form-card form {
+    width: 400px;     /* fixed width like smaller screens */
+  }
+}
+
+/* Large desktops (above 1838px) */
+@media (min-width: 1838px) {
+  .form-card form {
+    width: 450px;     /* slightly wider but still centered */
+  }
+}
+
+/* Center the submit button to match input width */
+.form-card button {
+  width: 100%;         /* match form width */
+  margin-left: 0;      /* remove offset */
 }

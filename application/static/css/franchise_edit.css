@@ -234,7 +234,7 @@ body {
   background-color: rgba(255, 255, 255, 0.04);
   color: #fff;
   font-size: 16px;
-  width: 100%;
+  width: 900px;
 }
 
 .form-card input::placeholder,

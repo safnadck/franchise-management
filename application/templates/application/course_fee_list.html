@@ -1,0 +1,125 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Course Fees</title>
+  <link rel="stylesheet" href="{% static 'css/course_fee_list.css' %}">
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+    </div>
+
+    <div class="user-panel">
+  <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+  <span class="user-name">{{ user.username }}</span>
+
+
+  <div class="dropdown-menu">
+    <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+  </div>
+
+
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+     <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Reciept</span>
+        </a>
+      </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+
+
+
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="page-content">
+     <div class="register-wrapper">
+  <div class="left-buttons">
+        <a href="{% url 'application:homepage' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+</div>
+
+
+     <div class="content">
+            <div class="fee-management-section">
+                <h2>Course Fees</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    <table class="fee-table">
+                        <thead>
+                            <tr>
+                                <th>Course Name</th>
+                                <th>Fee Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course, fee_obj in course_fees %}
+                            <tr>
+                                <td>{{ course.display_name }}</td>
+                                <td>
+                                    <input type="number" id="fee_{{ course.id }}" name="fee_{{ course.id }}" value="{{ fee_obj.fee }}" step="0.01" min="0" placeholder="Enter Fee" class="fee-input" />
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    <div class="form-actions">
+                        <button type="submit" class="btnview">Save Fees</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+  </main>
+
+<script>
+  const userPanel = document.querySelector('.user-panel');
+  const dropdownMenu = document.querySelector('.dropdown-menu');
+
+  // Toggle dropdown on click
+  userPanel.addEventListener('click', function(event) {
+    event.stopPropagation(); // prevent click from bubbling
+    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', function() {
+    dropdownMenu.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>

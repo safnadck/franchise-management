@@ -1,0 +1,207 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Fees Report</title>
+  <link rel="stylesheet" href="{% static 'css/monthly_fees_report.css' %}">
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+  </style>
+</head>
+
+<body>
+
+  <header class="navbar">
+    <a href="{% url 'application:homepage' %}" class="navbar-left">
+      <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+    </a>
+
+    <div class="user-panel">
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
+
+      <div class="dropdown-menu">
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+    </div>
+
+  </header>
+
+  <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Reciept</span>
+        </a>
+      </div>
+
+      <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+
+    </div>
+  </aside>
+
+  <main class="page-content">
+    <div class="register-wrapper">
+      <div class="left-buttons">
+        <a href="{% url 'application:fee_report' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+
+      <div class="right-buttons">
+
+      </div>
+    </div>
+
+    <form method="get" id="filter-form" style="margin-bottom: 20px;">
+  <label for="month-select">Month:</label>
+  <select id="month-select" name="month" onchange="this.form.submit()">
+    <option value="">All Months</option>
+    {% for m_val, m_name in months %}
+      <option value="{{ m_val }}" {% if selected_month == m_val %}selected{% endif %}>{{ m_name }}</option>
+    {% endfor %}
+  </select>
+
+  <label for="year-select">Year:</label>
+  <select id="year-select" name="year" onchange="this.form.submit()">
+    <option value="">All Years</option>
+    {% for y in years %}
+      <option value="{{ y }}" {% if selected_year == y %}selected{% endif %}>{{ y }}</option>
+    {% endfor %}
+  </select>
+
+  <button type="submit" class="filter-button">Filter</button>
+</form>
+
+
+    <div class="stats">
+      <div class="stat-box stat-total">
+        <span class="iconify stat-icon" data-icon="mdi:cash-multiple"></span>
+        <h2>₹{{ total_fees|floatformat:2 }}</h2>
+        <p>Total Fees</p>
+      </div>
+
+      <div class="stat-box stat-pending">
+        <span class="iconify stat-icon" data-icon="mdi:clock-alert"></span>
+        <h2>₹{{ total_pending|floatformat:2 }}</h2>
+        <p>Pending Fees</p>
+      </div>
+
+      <div class="stat-box stat-overdue">
+        <span class="iconify stat-icon" data-icon="mdi:alert-circle"></span>
+        <h2>₹{{ total_overdue|floatformat:2 }}</h2>
+        <p>Overdue Fees</p>
+      </div>
+
+      <div class="stat-box stat-received">
+        <span class="iconify stat-icon" data-icon="mdi:check-decagram"></span>
+        <h2>₹{{ total_received|floatformat:2 }}</h2>
+        <p>Received Fees</p>
+      </div>
+    </div>
+
+    <!-- Student Details Table -->
+    <div class="table-wrapper">
+      <table class="data-table">
+        <colgroup>
+          <col>
+          <col>
+          <col>
+          <col>
+          <col>
+          <col>
+          <col>
+          <col>
+          <col>
+        </colgroup>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Reg No</th>
+            <th>Phone Number</th>
+            <th>Email Address</th>
+            <th>Total Fees</th>
+            <th>Received Fees</th>
+            <th>Pending Fees</th>
+            <th>Overdue Fees</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for student in students_page %}
+          <tr>
+            <td>{{ student.name }}</td>
+            <td>{{ student.username }}</td>
+            <td>{{ student.phone_number }}</td>
+            <td>{{ student.email }}</td>
+            <td>₹{{ student.total_fees }}</td>
+            <td>₹{{ student.received_fees }}</td>
+            <td>₹{{ student.pending_fees }}</td>
+            <td>₹{{ student.overdue_fees }}</td>
+            <td><a href="{% url 'application:receipt_detail' student.user_franchise_id %}" class="btnview">Receipt</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="9" style="text-align: center;">No students found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+  </table>
+</div>
+
+<!-- Pagination Controls -->
+{% if students_page.has_other_pages %}
+<div class="pagination-wrapper">
+  <div class="pagination">
+    {% if students_page.has_previous %}
+      <a href="?{% if selected_month %}month={{ selected_month|date:'Y-m' }}&{% endif %}page={{ students_page.previous_page_number }}" class="pagination-link">&lsaquo; Previous</a>
+    {% endif %}
+
+    <span class="pagination-info">
+      Page {{ students_page.number }} of {{ students_page.paginator.num_pages }}
+    </span>
+
+    {% if students_page.has_next %}
+      <a href="?{% if selected_month %}month={{ selected_month|date:'Y-m' }}&{% endif %}page={{ students_page.next_page_number }}" class="pagination-link">Next &rsaquo;</a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<script>
+  const userPanel = document.querySelector('.user-panel');
+  const dropdownMenu = document.querySelector('.dropdown-menu');
+
+  userPanel.addEventListener('click', function(event) {
+    event.stopPropagation();
+    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+  });
+
+  document.addEventListener('click', function() {
+    dropdownMenu.style.display = 'none';
+  });
+</script>
+
+</body>
+</html>

@@ -40,12 +40,21 @@
           <span class="menu-text">Reciept</span>
         </a>
       </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
         <div class="menu-item">
             <a href="{% url 'application:homepage' %}" class="menu-link">
                 <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
                 <span class="menu-text">Reports</span>
             </a>
         </div>
+        
         <!-- <div class="menu-item">
             <a href="#" class="menu-link">
                 <span class="iconify menu-icon" data-icon="mdi:cog"></span>
@@ -70,8 +79,8 @@
         <div class="info-box">
             <p><strong>Batch:</strong> {{ batch.batch_no }} - {{ batch.course.display_name }}</p>
             <p><strong>Total Fees:</strong> ₹{{ batch.fees }}</p>
-            <p><strong>Discount:</strong> ₹{{ fee_management.discount }}</p>
-            <p><strong>Batch Remaining Amount:</strong> ₹{{ fee_management.remaining_amount }}</p>
+            <p><strong>Discount:</strong> ₹{{ student_fee.discount }}</p>
+            <p><strong>Student Remaining Amount:</strong> ₹{{ student_fee.remaining_amount }}</p>
             <p><strong>Registration Date:</strong> {{ enrollment.created.date }}</p>
         </div>
 
@@ -91,6 +100,24 @@
                 </div>
             {% endfor %}
         {% endif %}
+
+        <div class="discount-section">
+            <h3>Edit Student Discount</h3>
+            <form method="post" class="discount-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="save_discount">
+                <label for="{{ discount_form.discount.id_for_label }}">Discount Amount (₹):</label>
+                {{ discount_form.discount }}
+                {% if discount_form.discount.errors %}
+                    <div class="form-errors">
+                        {% for error in discount_form.discount.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+                <button type="submit">Save Discount</button>
+            </form>
+        </div>
 
         <form method="post" id="installment-form">
             {% csrf_token %}
@@ -207,7 +234,7 @@
         const addButton = document.getElementById('add-installment');
         const saveButton = document.getElementById('save-button');
         const totalFormsInput = document.querySelector('#id_form-TOTAL_FORMS');
-        const remainingAmount = parseFloat('{{ fee_management.remaining_amount }}');
+        const remainingAmount = parseFloat('{{ student_fee.remaining_amount }}');
         let formCount = parseInt(totalFormsInput.value);
 
         // Real-time calculation elements
@@ -284,8 +311,8 @@
             const input = event.target;
             const days = parseInt(input.value) || 0;
             
-            if (days < 1) {
-                input.setCustomValidity('Repayment days must be at least 1');
+            if (days < 0) {
+                input.setCustomValidity('Repayment days cannot be negative');
                 input.classList.add('field-error');
             } else {
                 input.setCustomValidity('');
@@ -304,7 +331,7 @@
                            class="amount-input">
                 </td>
                 <td>
-                    <input type="number" min="1" name="form-${formCount}-repayment_period_days"
+                    <input type="number" min="0" name="form-${formCount}-repayment_period_days"
                            id="id_form-${formCount}-repayment_period_days" required placeholder="Days"
                            class="days-input">
                 </td>

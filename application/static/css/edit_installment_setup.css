@@ -521,6 +521,66 @@ body {
   background-color: rgba(108, 117, 125, 0.1);
 }
 
+/* Discount Section */
+.discount-section {
+  background-color: rgba(22, 55, 109, 0.05);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.discount-section h3 {
+  color: #16376D;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+/* Discount Form */
+.discount-form {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 1rem;
+}
+
+.discount-form label {
+  font-weight: 600;
+  color: #16376D;
+  font-size: 14px;
+}
+
+.discount-form input {
+  width: 280px;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: rgba(22, 55, 109, 0.14);
+  font-size: 14px;
+}
+
+.discount-form input:focus {
+  outline: none;
+  border-color: #16376D;
+  box-shadow: 0 0 0 2px rgba(22, 55, 109, 0.2);
+}
+
+.discount-form button {
+  background-color: #16376D;
+  color: #fff;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.discount-form button:hover {
+  background-color: #122d59;
+}
+
 /* Responsive design */
 @media screen and (max-width: 768px) {
   .page-content {
@@ -561,18 +621,27 @@ body {
     font-size: 12px;
     min-width: 80px;
   }
+
+  .discount-form {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .discount-form input {
+    width: 100%;
+  }
 }
 
 @media screen and (max-width: 480px) {
   .installment-table {
     font-size: 11px;
   }
-  
+
   .installment-table th,
   .installment-table td {
     padding: 6px 8px;
   }
-  
+
   #add-installment,
   #save-button {
     width: 100%;

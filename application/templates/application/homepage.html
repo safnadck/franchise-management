@@ -1,6 +1,7 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,6 +10,7 @@
   <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
   </style>
 </head>
+
 <body>
 
   <!-- Navbar -->
@@ -18,15 +20,15 @@
     </div>
 
     <div class="user-panel">
-  <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
-  <span class="user-name">{{ user.username }}</span>
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
 
 
-  <div class="dropdown-menu">
-    <a href="{% url 'logout' %}" class="logout-link">Logout</a>
-  </div>
- 
-    
+      <div class="dropdown-menu">
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+
+
   </header>
 
   <!-- Sidebar -->
@@ -38,12 +40,20 @@
           <span class="menu-text">Franchise</span>
         </a>
       </div>
-     <div class="menu-item">
+      <div class="menu-item">
         <a href="{% url 'application:receipt_search' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
           <span class="menu-text">Reciept</span>
         </a>
       </div>
+
+      <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+
       <div class="menu-item">
         <a href="{% url 'application:homepage' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
@@ -51,66 +61,85 @@
         </a>
       </div>
 
-      
-      
-      <!-- <div class="menu-item">
-        <a href="#" class="menu-link">
-          <span class="iconify menu-icon" data-icon="mdi:cog"></span>
-          <span class="menu-text">Settings</span>
-        </a>
-      </div> -->
+
     </div>
   </aside>
 
   <!-- Main Content -->
   <main class="page-content">
-     <div class="register-wrapper">
-  <!-- <a href="{% url 'application:franchise_register' %}" class="register-button">Add Franchise</a> -->
-</div>
-     <div class="content">
-            <p>Welcome to the Franchise Management System. Here you can manage franchises, students, and courses.</p>
-<div class="stats">
 
-  <a href="{% url 'application:franchise_list' %}" class="stat-box-link">
-        <div class="stat-box">
+
+    <div class="register-wrapper">
+      <div class="left-buttons">
+
+      </div>
+
+      <div class="right-buttons">
+
+        {% if user.is_superuser %}
+        
+        <a href="{% url 'application:special_access_register' %}" class="register-button">
+           <span class="iconify plus-icon" data-icon="mdi:protected-outline"></span>
+           Grant Special Access</a>
+        {% endif %}
+
+      </div>
+    </div>
+
+    <div class="content">
+      <p>Welcome to the Franchise Management System. Here you can manage franchises, students, and courses.</p>
+      <div class="stats">
+
+        <a href="{% url 'application:franchise_list' %}" class="stat-box-link">
+          <div class="stat-box">
             <i class="fas fa-store"></i>
             <h2>{{ total_franchises }}</h2>
             <p>Total Franchises</p>
-        </div>
-    </a>
-    <div class="stat-box">
-        <i class="fas fa-user-graduate"></i>
-        <h2>{{ total_students }}</h2>
-        <p>Total Students</p>
-    </div>
-   
+          </div>
+        </a>
+        <a href="{% url 'application:student_counts' %}" class="stat-box-link">
+          <div class="stat-box">
+            <i class="fas fa-user-graduate"></i>
+            <h2>{{ total_students }}</h2>
+            <p>Total Students</p>
+          </div>
+        </a>
 
 
-     <a href="{% url 'application:inactive_users' %}" class="stat-box-link">
-        <div class="stat-box">
+
+        <a href="{% url 'application:inactive_users' %}" class="stat-box-link">
+          <div class="stat-box">
             <i class="fas fa-store"></i>
             <h2>👤</h2>
             <p>Inactive Users</p>
-        </div>
-    </a>
+          </div>
+        </a>
 
 
-    <a href="" class="stat-box-link">
-    <div class="stat-box">
-        <i class="fas fa-book"></i>
-        <h2>{{ total_courses }}</h2>
-        <p>Total Courses</p>
-    </div>
-     </a>
+        <a href="{% url 'application:course_fee_list' %}" class="stat-box-link">
+          <div class="stat-box">
+            <i class="fas fa-book"></i>
+            <h2>{{ total_courses }}</h2>
+            <p>Total Courses</p>
+          </div>
+        </a>
 
-     <a href="{% url 'application:fee_reminders' %}" class="stat-box-link">
-    <div class="stat-box">
-        <i class="fas fa-book"></i>
-        <h2>₹</h2>
-        <p>Fee Payement Reminder</p>
-    </div>
-     </a>
-</div>
+        <a href="{% url 'application:fee_reminders' %}" class="stat-box-link">
+          <div class="stat-box">
+            <i class="fas fa-book"></i>
+            <h2>₹</h2>
+            <p>Fee Payement Reminder</p>
+          </div>
+        </a>
+
+        <a href="{% url 'application:fee_report' %}" class="stat-box-link">
+          <div class="stat-box">
+            <i class="fas fa-book"></i>
+            <h2>📊</h2>
+            <p>Fee Report</p>
+          </div>
+        </a>
+      </div>
 
 
 
@@ -124,21 +153,22 @@
 
 
 
-<script>
-  const userPanel = document.querySelector('.user-panel');
-  const dropdownMenu = document.querySelector('.dropdown-menu');
+  <script>
+    const userPanel = document.querySelector('.user-panel');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
 
-  // Toggle dropdown on click
-  userPanel.addEventListener('click', function(event) {
-    event.stopPropagation(); // prevent click from bubbling
-    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
-  });
+    // Toggle dropdown on click
+    userPanel.addEventListener('click', function (event) {
+      event.stopPropagation(); // prevent click from bubbling
+      dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+    });
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', function() {
-    dropdownMenu.style.display = 'none';
-  });
-</script>
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function () {
+      dropdownMenu.style.display = 'none';
+    });
+  </script>
 
 </body>
+
 </html>

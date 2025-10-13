@@ -1,0 +1,164 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Enroll Existing User</title>
+    <link rel="stylesheet" href="{% static 'css/enroll_existing_user_general.css' %}">
+    <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+<body>
+
+<header class="navbar">
+    <a href="{% url 'application:homepage' %}" class="navbar-left">
+        <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+    </a>
+
+    <div class="user-panel">
+        <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+        <span class="user-name">{{ user.username }}</span>
+
+        <div class="dropdown-menu">
+            <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+        </div>
+    </div>
+</header>
+
+<aside class="sidebar-menu">
+    <div class="menu-wrapper">
+
+        <div class="menu-item">
+            <a href="{% url 'application:franchise_list' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+                <span class="menu-text">Franchise</span>
+            </a>
+        </div>
+        <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Receipt</span>
+        </a>
+      </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
+        <div class="menu-item">
+            <a href="{% url 'application:homepage' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+                <span class="menu-text">Reports</span>
+            </a>
+        </div>
+    </div>
+</aside>
+
+<main class="page-content">
+    <div class="register-wrapper">
+        <div class="left-buttons">
+            <a href="{% url 'application:user_register' %}" class="backbutton">
+                <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+            </a>
+        </div>
+    </div>
+    <div class="form-card">
+        <h2>Enroll Existing User</h2>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="GET" action="">
+            <input type="text" name="search_query" placeholder="Search by name, email, phone, or username" value="{{ search_query }}">
+            <button type="submit">
+                <span class="iconify" data-icon="mdi:magnify" style="font-size: 18px;"></span>
+                Search
+            </button>
+        </form>
+
+        {% if user_search_results %}
+            <h3>Search Results (Select users)</h3>
+            <form method="POST">
+                {% csrf_token %}
+                <div class="user-selection">
+                    {% for user in user_search_results %}
+                        <label class="user-option">
+                            <input type="checkbox" name="user_ids" value="{{ user.id }}">
+                            <span>{{ user.get_full_name }} ({{ user.username }}) - {{ user.email }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+
+                <!-- Franchise Dropdown -->
+                <select name="franchise" id="franchise-select" required>
+                    <option value="">Select Franchise</option>
+                    {% for franchise in franchises %}
+                    <option value="{{ franchise.id }}">{{ franchise.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Batch Dropdown -->
+                <select name="batch" id="batch-select" required disabled>
+                    <option value="">Select Batch</option>
+                </select>
+
+                <button type="submit">
+                    <span class="iconify" data-icon="mdi:account-plus" style="font-size: 18px;"></span>
+                    Enroll Selected Users
+                </button>
+            </form>
+        {% elif search_query %}
+            <p>No users found matching "{{ search_query }}".</p>
+        {% endif %}
+    </div>
+</main>
+
+<script>
+  const userPanel = document.querySelector('.user-panel');
+  const dropdownMenu = document.querySelector('.dropdown-menu');
+
+  // Toggle dropdown on click
+  userPanel.addEventListener('click', function(event) {
+    event.stopPropagation(); // prevent click from bubbling
+    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+  });
+
+  document.addEventListener('click', function() {
+    dropdownMenu.style.display = 'none';
+  });
+
+  // AJAX for loading batches
+  const franchiseSelect = document.getElementById('franchise-select');
+  const batchSelect = document.getElementById('batch-select');
+
+  franchiseSelect.addEventListener('change', function() {
+    const franchiseId = this.value;
+    if (franchiseId) {
+      fetch(`/get-batches/${franchiseId}/`)
+        .then(response => response.json())
+        .then(data => {
+          batchSelect.innerHTML = '<option value="">Select Batch</option>';
+          data.batches.forEach(batch => {
+            const option = document.createElement('option');
+            option.value = batch.id;
+            option.textContent = batch.batch_no;
+            batchSelect.appendChild(option);
+          });
+          batchSelect.disabled = false;
+        })
+        .catch(error => console.error('Error fetching batches:', error));
+    } else {
+      batchSelect.innerHTML = '<option value="">Select Batch</option>';
+      batchSelect.disabled = true;
+    }
+  });
+</script>
+
+</body>
+</html>

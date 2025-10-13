@@ -1,0 +1,272 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  background-color: #ffffff;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  background-color: white;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  height: 70px;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+}
+
+.brand-logo {
+  width: 150px;
+  height: auto;
+  max-height: 40px;
+  margin-left: 20px;
+}
+
+.user-panel {
+  position: relative; /* Needed for absolute dropdown */
+  margin-top: 2%;
+  display: flex;
+  align-items: center;
+  background-color: rgba(22, 55, 109, 0.1);
+  padding: 10px 16px;
+  border-radius: 14px;
+  color: #16376D;
+  gap: 8px;
+  font-size: 14px;
+  margin-right: 20px;
+  cursor: pointer; /* shows pointer on hover */
+}
+
+.dropdown-menu {
+  display: none;
+  position: absolute;
+  top: 100%; /* right below user panel */
+  right: 0;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0px 4px 10px rgba(0,0,0,0.15);
+  min-width: 120px;
+  z-index: 1000;
+}
+
+.dropdown-menu a {
+  display: block;
+  padding: 10px 15px;
+  text-decoration: none;
+  color: #16376D;
+  font-weight: 600;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+
+.user-name {
+  
+ font-size: 15px;
+  text-transform: capitalize;
+  font-weight: 700;
+ 
+}
+
+.profile {
+  font-size: 25px;
+}
+
+/* Sidebar */
+.sidebar-menu {
+  position: fixed;
+  top: 120px;
+  left: 20px;
+  width: 80px; /* collapsed */
+  height: calc(100vh - 70px);
+  background-color: white;
+  transition: width 0.3s ease;
+  overflow: hidden;
+}
+
+.sidebar-menu:hover {
+  width: 250px; /* expanded */
+}
+
+.menu-wrapper {
+  padding: 1rem;
+}
+
+.menu-item {
+  background-color: rgba(22, 55, 109, 0.09);
+  border-radius: 14px;
+  margin-bottom: 0.75rem;
+  transition: background-color 0.3s ease;
+}
+
+.menu-item:hover {
+  background-color: rgba(22, 55, 109, 0.2);
+}
+
+
+.menu-link {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 0.6rem 1rem;
+  text-decoration: none;
+  color: #16376D;
+  gap: 12px;
+  white-space: nowrap;
+  transition: padding 0.3s ease;
+}
+
+/* Collapsed: icons centered */
+.sidebar-menu:not(:hover) .menu-link {
+  padding: 0.6rem 0.6rem;
+}
+
+.menu-icon {
+  color: #16376D;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.menu-text {
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Show text only on hover */
+.sidebar-menu:hover .menu-text {
+  opacity: 1;
+}
+
+
+
+/* ---------- Main Content ---------- */
+.page-content {
+  margin-left: 80px;
+  margin-top: 50px; /* below navbar */
+  padding: 2rem;
+  min-height: calc(100vh - 70px);
+  background: #ffffff;
+  transition: margin-left 0.3s ease;
+}
+
+.sidebar-menu:hover ~ .page-content {
+  margin-left: 250px;
+}
+
+
+
+
+.student-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.register-wrapper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  gap: 15px;
+}
+
+.right-buttons {
+  display: flex;
+  gap: 15px;
+}
+
+.left-buttons {
+  display: flex;
+  justify-content: flex-start;
+  margin-right: auto;
+}
+
+.backbutton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background-color: #fff;
+  border: 1px solid #16376D;
+  color: #16376D;
+  padding: 10px 20px;
+  border-radius: 14px;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+}
+
+.franchise-card {
+  background: white;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.franchise-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.12);
+}
+
+.franchise-card h2 {
+  color: #16376D;
+  margin-bottom: 10px;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.total-students {
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: #555;
+}
+
+.batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.batch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px;
+  background-color: rgba(22, 55, 109, 0.05);
+  border-radius: 8px;
+}
+
+.batch-name {
+  font-weight: 600;
+  color: #16376D;
+}
+
+.student-count {
+  font-weight: 500;
+  color: #555;
+}

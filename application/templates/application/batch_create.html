@@ -41,6 +41,12 @@
           <span class="menu-text">Reciept</span>
         </a>
       </div>
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
       <div class="menu-item">
         <a href="{% url 'application:homepage' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
@@ -70,13 +76,14 @@
     <form method="post">
       {% csrf_token %}
       <input type="text" name="batch_no" placeholder="Batch Number" value="{{ form.batch_no.value|default_if_none:'' }}" />
-      <input type="number" name="fees" placeholder="Fees" value="{% if form.fees.value == 0 %}{% else %}{{ form.fees.value }}{% endif %}" />
-      <select name="course">
+      <select id="course" name="course" data-url="{% url 'application:get_course_fee' 'placeholder' %}">
         <option value="">Select Course</option>
         {% for course in form.fields.course.queryset %}
           <option value="{{ course.id }}" {% if course.id|stringformat:"s" == form.course.value|stringformat:"s" %}selected{% endif %}>{{ course.display_name }}</option>
         {% endfor %}
       </select>
+      <div id="course-fee">Fee: ₹0</div>
+      <input type="number" name="discount" placeholder="Discount Amount" value="{{ form.discount.value|default_if_none:'' }}" step="0.01" min="0" />
       <button type="submit">Create Batch</button>
     </form>
   </div>
@@ -94,6 +101,28 @@
   // Close dropdown when clicking outside
   document.addEventListener('click', function() {
     dropdownMenu.style.display = 'none';
+  });
+
+  // Show course fees when course is selected
+  const courseSelect = document.getElementById('course');
+  const courseFeeDiv = document.getElementById('course-fee');
+
+  courseSelect.addEventListener('change', function() {
+    const courseId = this.value;
+    if (courseId) {
+      const url = courseSelect.dataset.url.replace('placeholder', courseId);
+      fetch(url)
+        .then(response => response.json())
+        .then(data => {
+          courseFeeDiv.textContent = `Fee: ₹${data.fee}`;
+        })
+        .catch(error => {
+          console.error('Error fetching course fee:', error);
+          courseFeeDiv.textContent = 'Fee: ₹0';
+        });
+    } else {
+      courseFeeDiv.textContent = 'Fee: ₹0';
+    }
   });
 </script>
 

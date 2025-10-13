@@ -90,7 +90,7 @@ body {
 /* Sidebar */
 .sidebar-menu {
   position: fixed;
-  top: 100px;
+  top: 120px;
   left: 20px;
   width: 80px;
   height: calc(100vh - 70px);
@@ -204,6 +204,7 @@ body {
   font-size: 15px;
   font-weight: 600;
   transition: background-color 0.3s ease;
+
 }
 
 /* Content Sections */
@@ -420,8 +421,8 @@ body {
 }
 
 .status-pending {
-  background-color: #fff3cd;
-  color: #856404;
+  background-color: #572a2a2f;
+  color: #7a0404;
 }
 
 .status-overdue {
@@ -440,27 +441,7 @@ body {
   font-weight: 600;
 }
 
-/* Page Headings */
-.page-heading {
-  color: #16376D;
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 2rem;
-  text-align: center;
-  background-color: rgba(22, 55, 109, 0.1);
-  padding: 1rem;
-  border-radius: 14px;
-}
 
-.section-heading {
-  color: #16376D;
-  font-size: 1.5rem;
-  font-weight: 600;
-  margin-bottom: 1rem;
-  text-align: left;
-  border-bottom: 2px solid #16376D;
-  padding-bottom: 0.5rem;
-}
 
 /* Print Section */
 .print-section {
@@ -470,6 +451,7 @@ body {
   background-color: rgba(22, 55, 109, 0.05);
   border-radius: 14px;
 }
+
 
 .print-button {
   display: inline-flex;
@@ -513,73 +495,167 @@ body {
   box-shadow: none !important;
 }
 
-/* Print Styles */
-@media print {
-  .navbar,
-  .sidebar-menu,
-  .backbutton,
-  .print-section,
-  .payment-section {
-    display: none !important;
-  }
 
-  .page-content {
-    margin-left: 0 !important;
-    margin-top: 0 !important;
-    padding: 0 !important;
-  }
 
-  .user-info-section,
-  .installments-section {
-    box-shadow: none !important;
-    border: 1px solid #ddd !important;
-  }
-
-  .installments-table {
-    font-size: 12px;
-  }
-
-  .installments-table th,
-  .installments-table td {
-    padding: 6px;
-  }
+.course-section {
+    margin-top: 30px;
+    background-color: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    overflow: hidden;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-left: 6px solid #16376D; /* accent color for course */
+    padding: 20px;
 }
 
-/* Responsive */
-@media screen and (max-width: 768px) {
-  .page-content {
-    margin-left: 80px;
-    padding: 1rem;
-  }
+.course-section:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.12);
+}
 
-  .student-info-section,
-  .franchise-batch-section,
-  .fee-management-section,
-  .user-info-section,
-  .payment-section,
-  .installments-section {
-    padding: 1rem;
-  }
-
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .student-info-section h2,
-  .franchise-batch-section h2,
-  .fee-management-section h2,
-  .user-info-section h2,
-  .payment-section h2,
-  .installments-section h2 {
+.course-header {
+    background-color: #16376D;
+    color: #fff;
+    padding: 15px 20px;
     font-size: 1.25rem;
-  }
-
-  .installments-table {
-    font-size: 12px;
-  }
-
-  .installments-table th,
-  .installments-table td {
-    padding: 8px;
-  }
+    font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: -20px -20px 20px -20px;
+    border-radius: 14px 14px 0 0;
 }
+
+.course-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.course-icon {
+    font-size: 24px;
+    color: #fff;
+}
+
+.course-meta {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.batch-label {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.course-status {
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.course-status.enrolled {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.course-status.not-enrolled {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+
+/* Collapsible Buttons */
+.collapsible {
+    background-color: rgba(22, 55, 109, 0.1);
+    color: #16376D;
+    cursor: pointer;
+    padding: 12px 18px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 16px;
+    font-weight: 600;
+    border-radius: 8px;
+    margin-top: 15px;
+    transition: background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.collapsible:hover {
+    background-color: rgba(22, 55, 109, 0.2);
+}
+
+.collapsible-icon {
+    font-size: 20px;
+    color: #16376D;
+}
+
+.collapsible.active {
+    background-color: rgba(22, 55, 109, 0.15);
+}
+
+/* Collapsible Sections for Payment and Installments */
+.payment-section, .installments-section {
+    margin-top: 10px;
+    border: 1px solid rgba(22, 55, 109, 0.1);
+    border-radius: 8px;
+    padding: 15px;
+    background-color: rgba(22, 55, 109, 0.02);
+}
+
+/* Enrollment status badge in course header */
+.course-status {
+    font-size: 0.9rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 10px;
+    text-transform: uppercase;
+}
+
+.course-status.enrolled {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.course-status.not-enrolled {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.enrollment-form-inline {
+    display: inline;
+    margin: 0;
+    padding: 0;
+}
+
+.status-btn {
+    background: none;
+    border: none;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-transform: inherit;
+    letter-spacing: inherit;
+}
+
+.status-btn:hover {
+    opacity: 0.8;
+}
+
+
+

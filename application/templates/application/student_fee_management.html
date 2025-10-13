@@ -44,6 +44,14 @@
           <span class="menu-text">Reciept</span>
         </a>
       </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
         <div class="menu-item">
             <a href="{% url 'application:homepage' %}" class="menu-link">
                 <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
@@ -80,11 +88,11 @@
                 </div>
                 <div class="info-item">
                     <label>Discount:</label>
-                    <span>₹{{ fee_management.discount }}</span>
+                    <span>₹{{ student_fee.discount }}</span>
                 </div>
                 <div class="info-item">
                     <label>Remaining Amount:</label>
-                    <span>₹{{ fee_management.remaining_amount }}</span>
+                    <span>₹{{ student_fee.remaining_amount }}</span>
                 </div>
             </div>
         </div>
@@ -94,105 +102,60 @@
             <h2>Fee Management</h2>
             <div class="fee-summary">
                 <h3>Fee Summary</h3>
-                <p><strong>Total Paid:</strong> ₹<span id="total-paid">{{ total_paid }}</span></p>
                 <p><strong>Total Pending:</strong> ₹<span id="total-pending">{{ total_pending }}</span></p>
             </div>
 
-            <form method="post" id="fee-management-form">
-                {% csrf_token %}
-                <table class="fee-table" id="installments-table">
-                    <thead>
-                        <tr>
-                            <th>Installment Due Date</th>
-                            <th>Amount</th>
-                             <th>payment Days</th>
-                            <th>Paid Amount</th>
-                           
-                            <th>Status</th>
-                            <th>Payment Date</th>
-                            <th>Print Invoice</th>
-                        </tr>
-                    </thead>
-                    <tbody id="installments-tbody">
-                        {% for item in installments %}
-                            {% with installment=item.installment %}
-                            <tr class="installment-row">
-                                <td>{{ installment.due_date|date:'d/m/Y' }}</td>
-                                <td>{{ installment.amount }}</td>
-                                <td>{{ item.repayment_period_days }}</td>
-                                <td class="payed-amount">
-                                    <input type="number" name="payed_amount_{{ installment.id }}" value="{{ installment.payed_amount }}" step="0.01" min="0" class="payed-amount-input" {% if installment.status == "paid" %}readonly{% endif %}>
-                                </td>
-                                
-                                <td>
-                                    {% if installment.status == "paid" %}
-                                        <span>Paid</span>
-                                    {% else %}
-                                    <select name="status_{{ installment.id }}" class="status-select">
-                                        <option value="pending" {% if installment.status == "pending" %}selected{% endif %}>Pending</option>
-                                        <option value="paid" {% if installment.status == "paid" %}selected{% endif %}>Paid</option>
-                                        <!-- <option value="overdue" {% if installment.status == "overdue" %}selected{% endif %}>Overdue</option> -->
-                                    </select>
-                                    {% endif %}
-                                </td>
-                                <td>{% if installment.payment_date %}{{ installment.payment_date|date:'d/m/Y' }}{% else %}-{% endif %}</td>
-                                <td>
-                                    {% if installment.status == "paid" %}
-                                        <a href="{% url 'application:print_installment_invoice' franchise_pk=franchise.id batch_pk=batch.id user_pk=user.id installment_pk=installment.id %}" target="_blank" class="print-invoice-btn"> <span class="iconify menu-icon" data-icon="material-symbols-light:print-rounded"></span></a>
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endwith %}
-                        {% endfor %}
-                    </tbody>
-                </table>
+            <table class="fee-table" id="installments-table">
+                <thead>
+                    <tr>
+                        <th>Installment Due Date</th>
+                        <th>Amount</th>
+                         <th>payment Days</th>
+                        <th>Paid Amount</th>
 
-                <div class="form-actions">
-                    <a href="{% url 'application:edit_installment_setup' franchise_pk=franchise.id batch_pk=batch.id user_pk=user.id %}" class="btn-secondary">Edit Installment</a>
-                    <button type="submit" class="seved">save</button>
-                </div>
-            </form>
+                        <th>Status</th>
+                        <th>Payment Date</th>
+                        <th>Print Invoice</th>
+                    </tr>
+                </thead>
+                <tbody id="installments-tbody">
+                    {% for item in installments %}
+                        {% with installment=item.installment %}
+                        <tr class="installment-row">
+                            <td>{{ installment.due_date|date:'d/m/Y' }}</td>
+                            <td>{{ installment.amount }}</td>
+                            <td>{{ item.repayment_period_days }}</td>
+                            <td class="payed-amount">
+                                {{ installment.payed_amount }}
+                            </td>
+
+                            <td>
+                                {% if installment.status == "paid" %}
+                                    <span>Paid</span>
+                                {% else %}
+                                    <span>{{ installment.status|title }}</span>
+                                {% endif %}
+                            </td>
+                            <td>{% if installment.payment_date %}{{ installment.payment_date|date:'d/m/Y' }}{% else %}-{% endif %}</td>
+                            <td>
+                                {% if installment.status == "paid" %}
+                                    <a href="{% url 'application:print_installment_invoice' franchise_pk=franchise.id batch_pk=batch.id user_pk=user.id installment_pk=installment.id %}" target="_blank" class="print-invoice-btn"> <span class="iconify menu-icon" data-icon="material-symbols-light:print-rounded"></span></a>
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="form-actions">
+                <a href="{% url 'application:edit_installment_setup' franchise_pk=franchise.id batch_pk=batch.id user_pk=user.id %}" class="btn-secondary">Edit Installment</a>
+            </div>
         </div>
     </main>
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    const tbody = document.getElementById('installments-tbody');
-    const totalPaidSpan = document.getElementById('total-paid');
-    const totalPendingSpan = document.getElementById('total-pending');
 
-    // Function to update totals based on payed amount inputs
-    function updateTotals() {
-        let totalPaid = 0;
-        let totalPending = 0;
-
-        const rows = tbody.querySelectorAll('.installment-row');
-        rows.forEach(row => {
-            const amountCell = row.querySelector('td:nth-child(2)'); // Amount column
-            const payedAmountInput = row.querySelector('.payed-amount-input');
-
-            const amount = parseFloat(amountCell.textContent) || 0;
-            const payedAmount = parseFloat(payedAmountInput.value) || 0;
-
-            totalPaid += payedAmount;
-            totalPending += (amount - payedAmount);
-        });
-
-        totalPaidSpan.textContent = totalPaid.toFixed(2);
-        totalPendingSpan.textContent = totalPending.toFixed(2);
-    }
-
-    // Add event listeners to payed amount inputs
-    const payedAmountInputs = tbody.querySelectorAll('.payed-amount-input');
-    payedAmountInputs.forEach(input => {
-        input.addEventListener('input', updateTotals);
-    });
-
-    // Initial update
-    updateTotals();
-});
-</script>
 
 </body>
 </html>

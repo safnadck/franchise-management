@@ -251,10 +251,10 @@ body {
 }
 
 .data-table {
-  text-align: center;
+  text-align: left;
   width: 100%;
   border-collapse: collapse;
-
+  table-layout: fixed;
 }
 .data-table thead {
   background-color: #16376D;
@@ -262,15 +262,31 @@ body {
 }
 
 .data-table thead th {
-  padding: 13px;
-  text-align: center;
+  padding: 13px 15px;
+  text-align: left;
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
 }
 
+.data-table thead th:nth-child(1) {
+  width: 30%;
+}
+
+.data-table thead th:nth-child(2) {
+  width: 40%;
+}
+
+.data-table thead th:nth-child(3) {
+  width: 10%;
+}
+
+.data-table thead th:nth-child(4) {
+  width: 20%;
+}
+
 .data-table tbody td {
- padding: 9px;
+ padding: 9px 15px;
   border-bottom: 1px solid #e0e0e0;
   font-size: 14px;
   font-weight: 400;
@@ -284,22 +300,15 @@ body {
 
 .data-table td:first-child,
 .data-table th:first-child {
-  text-align: left;
-  padding-left: 40px;
-  width: 0%;
   white-space: nowrap;
 }
 
 .data-table td:last-child,
 .data-table th:last-child {
   text-align: right;
-  padding-right: 45px;
 }
 .data-table td:nth-child(2),
 .data-table th:nth-child(2) {
-  width: 25%;
-  padding-right: 20rem; /* small padding instead of huge fixed value */
-  text-align: center;
 }
 
 
@@ -411,4 +420,3 @@ body {
 
   
 }
-

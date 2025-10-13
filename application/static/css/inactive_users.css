@@ -428,6 +428,66 @@ body {
   border-radius: 14px;
 }
 
+/* Filter Form */
+#filter-form {
+  background-color: white;
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 2rem;
+  margin-left: auto;
+  margin-right: auto;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  justify-content: center;
+}
+
+#filter-form label {
+  font-weight: 600;
+  color: #16376D;
+  margin-right: 0.5rem;
+  font-size: 16px;
+}
+
+#filter-form select,
+#filter-form input {
+  padding: 0.75rem 1.5rem;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 16px;
+  min-width: 200px;
+  background-color: white;
+  color: #16376D;
+}
+
+#filter-form select:focus,
+#filter-form input:focus {
+  outline: none;
+  border-color: #16376D;
+  box-shadow: 0 0 5px rgba(22, 55, 109, 0.3);
+}
+
+.filter-button {
+  background: linear-gradient(120deg, #16376D 50%, rgba(255, 254, 39, 1) 50%);
+  background-size: 200% 200%;
+  background-position: top left;
+  color: #fff;
+  padding: 0.75rem 2rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-position 0.3s ease, color 0.3s ease;
+}
+
+.filter-button:hover {
+  background-position: bottom right;
+  color: #16376D;
+}
+
 /* Responsive */
 @media screen and (max-width: 768px) {
   .page-content {
@@ -443,7 +503,7 @@ body {
   .data-table tbody td {
     padding: 0.75rem;
   }
-  
+
   .edit-btn {
     font-size: 12px;
     padding: 4px 8px;
@@ -452,7 +512,7 @@ body {
   .franchise-details-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .franchise-title {
     font-size: 1.25rem;
   }

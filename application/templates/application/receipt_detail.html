@@ -33,201 +33,267 @@
                     <span class="menu-text">Franchise</span>
                 </a>
             </div>
-             <div class="menu-item">
-        <a href="{% url 'application:receipt_search' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
-          <span class="menu-text">Reciept</span>
-        </a>
-      </div>
+            <div class="menu-item">
+                <a href="{% url 'application:receipt_search' %}" class="menu-link">
+                    <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+                    <span class="menu-text">Receipt</span>
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{% url 'application:user_register' %}" class="menu-link">
+                    <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+                    <span class="menu-text">Registration</span>
+                </a>
+            </div>
             <div class="menu-item">
                 <a href="{% url 'application:homepage' %}" class="menu-link">
                     <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
                     <span class="menu-text">Reports</span>
                 </a>
             </div>
-           
         </div>
     </aside>
 
     <!-- Main Content -->
-    <main class="page-content">
-        <div class="register-wrapper">
+    <main class="page-content"> 
+
+
+         <div class="register-wrapper">
             <div class="left-buttons">
-                <a href="{% url 'application:receipt_search' %}" class="backbutton">
-                    <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+                <a href="javascript:history.back()" class="backbutton">
+                    <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span> 
                 </a>
             </div>
-        </div>
+        </div> 
+
+
+       
 
         <!-- User Information Section -->
-        <div class="user-info-section">
-            <h2>Student Information</h2>
-            <div class="info-grid">
-                <div class="info-item">
-                    <label>Student Name:</label>
-                    <span>{{ user_franchise.user.get_full_name }}</span>
+      <div class="user-info-section">
+    <h2 class="section-heading">Student Information</h2>
+    <div class="info-grid">
+        <div class="info-item">
+            <label>Student Name:</label>
+            <span>{{ user.get_full_name }}</span>
+        </div>
+         <div class="info-item">
+            <label>Registration Number:</label>
+            <span>{{ registration_number }}</span>
+        </div>
+        <div class="info-item">
+            <label>Email Address:</label>
+            <span>{{ user.email }}</span>
+        </div>
+        <div class="info-item">
+            <label>Phone Number:</label>
+            <span>{{ user_profile.phone_number }}</span>
+        </div>
+       
+    </div>
+</div>
+
+       <!-- Messages -->
+            {% if messages %}
+            <div class="messages-container">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
                 </div>
-                <div class="info-item">
-                    <label>Registration Number:</label>
-                    <span>{{ user_franchise.registration_number }}</span>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+        {% for data in user_franchise_data %}
+        <!-- Course Section -->
+        <div class="course-section">
+            <div class="course-header">
+                <div class="course-title">
+                    <span class="iconify course-icon" data-icon="fa-solid:book"></span>
+                    <span>Course: {{ data.user_franchise.batch.course.display_name }}</span>
                 </div>
-                <div class="info-item">
-                    <label>Email Address:</label>
-                    <span>{{ user_franchise.user.email }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Phone Number:</label>
-                    <span>{{ user_profile.phone_number }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Batch:</label>
-                    <span>{{ user_franchise.batch.batch_no }}</span>
-                </div>
-                <div class="info-item">
-                    <label>Enrollment Status:</label>
-                    <span class="{% if is_enrolled %}enrolled{% else %}not-enrolled{% endif %}">
-                        {% if is_enrolled %}Enrolled{% else %}Not Enrolled{% endif %}
+                <div class="course-meta">
+                    <span class="batch-label">Batch: {{ data.user_franchise.batch.batch_no }}</span>
+                    <span class="course-status {% if data.is_enrolled %}enrolled{% else %}not-enrolled{% endif %}">
+                        <form method="post" class="enrollment-form-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="user_franchise_id" value="{{ data.user_franchise.id }}">
+                            <button type="submit" name="action" value="{% if data.is_enrolled %}unenroll{% else %}enroll{% endif %}" class="status-btn">
+                                {% if data.is_enrolled %}Unenroll{% else %}Enroll{% endif %}
+                            </button>
+                        </form>
                     </span>
                 </div>
             </div>
 
-            <!-- Enrollment Actions -->
-            <div class="enrollment-actions">
-                <form method="post">
+     
+
+            <!-- Collapsible Payment Section -->
+            <button class="collapsible">
+                <span class="iconify collapsible-icon" data-icon="mdi:cash-multiple"></span>
+                Apply Payment
+            </button>
+            <div class="content-collapsible payment-section">
+                <form class="payment-form" method="post" onsubmit="return validatePaymentForm(this)">
                     {% csrf_token %}
-                    {% if is_enrolled %}
-                        <button type="submit" name="action" value="unenroll" class="unenroll-btn-alt">
-                            <span class="iconify plus-icon" data-icon="vaadin:minus"></span>
-                            Unenroll
-                        </button>
-                    {% else %}
-                        <button type="submit" name="action" value="enroll" class="enroll-btn-alt">
-                            <span class="iconify plus-icon" data-icon="vaadin:plus"></span>
-                            Enroll
-                        </button>
-                    {% endif %}
+                    <input type="hidden" name="user_franchise_id" value="{{ data.user_franchise.id }}">
+                    <div class="form-group">
+                        <label class="form-label" for="payment_amount_{{ data.user_franchise.id }}">Payment Amount (₹)</label>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            name="payment_amount"
+                            id="payment_amount_{{ data.user_franchise.id }}"
+                            class="form-input"
+                            placeholder="Enter payment amount"
+                            required
+                        >
+                    </div>
+                    <button type="submit" class="form-button">Apply Payment</button>
                 </form>
             </div>
-        </div>
 
-        <!-- Payment Form Section -->
-        <div class="payment-section">
-            <h2>Apply Payment</h2>
-            <form class="payment-form" method="post" action="{% url 'application:receipt_detail' user_franchise.id %}">
-                {% csrf_token %}
-                <div class="form-group">
-                    <label class="form-label" for="payment_amount">Payment Amount</label>
-                    <input
-                        type="number"
-                        step="0.01"
-                        name="payment_amount"
-                        id="payment_amount"
-                        class="form-input"
-                        placeholder="Enter payment amount"
-                        required
-                    >
+            <!-- Collapsible Installment Section -->
+            <button class="collapsible">
+                <span class="iconify collapsible-icon" data-icon="mdi:calendar-clock"></span>
+                Installment History
+            </button>
+            <div class="content-collapsible installments-section">
+                {% if data.installments %}
+                <table class="installments-table">
+                    <thead>
+                        <tr>
+                            <th>Due Date</th>
+                            <th>Amount</th>
+                            <th>Paid Amount</th>
+                            <th>Remaining Amount</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for installment in data.installments %}
+                            <tr class="installment-row {% if installment.id in request.session.affected_installments %}recently-updated{% endif %}">
+                                <td>{{ installment.due_date|date:"M d, Y" }}</td>
+                                <td>₹{{ installment.amount }}</td>
+                                <td>₹{{ installment.payed_amount }}</td>
+                                <td>
+                                    {% if installment.status == 'paid' %}
+                                        ₹0.00
+                                    {% else %}
+                                        ₹{{ installment.remaining_amount|floatformat:2 }}
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{{ installment.status }}">
+                                        {{ installment.get_status_display }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <div class="no-installments">
+                    <p>No installments found for this course.</p>
                 </div>
-                <button type="submit" class="form-button">Apply Payment</button>
-            </form>
-        </div>
+                {% endif %}
+            </div>
 
-        <!-- Print Button Section -->
-    
+            <!-- Individual Course Print Button -->
+            <div class="print-section">
+                <a href="{% url 'application:print_receipt_detail' data.user_franchise.id %}" class="print-button" target="_blank">
+                    <span class="iconify" data-icon="mdi:printer" style="font-size: 20px; margin-right: 8px;"></span>
+                    Print Course Receipt
+                </a>
+            </div>
+        </div>
+        {% endfor %}
 
         <!-- Payment Print Button Section -->
-        <div class="print-section">
+        <div class="print-section main-print-section">
             <button
                 id="payment-print-button"
                 class="print-button payment-print-button"
                 {% if not payment_just_made %}disabled{% endif %}
-                {% if payment_just_made %}data-print-url="{% url 'application:print_payment_detail' user_franchise.id %}"{% endif %}
-                onclick="printPaymentDetails()"
+                {% if payment_just_made %}data-print-url="{% url 'application:print_payment_detail' user_franchise_data.0.user_franchise.id %}"{% endif %}
             >
                 <span class="iconify" data-icon="mdi:printer" style="font-size: 20px; margin-right: 8px;"></span>
                 {% if payment_just_made %}
-                    Print Payment (₹{{ last_payment_amount }})
+                    Print Payment Receipt (₹{{ last_payment_amount }})
                 {% else %}
-                    Print Payment (No recent payment)
+                    Print Payment Receipt (No recent payment)
                 {% endif %}
             </button>
-
             
-        </div>
-
-        <!-- Installments Table Section -->
-        <div class="installments-section">
-            <h2>Installment History</h2>
-            <table class="installments-table">
-                <thead>
-                    <tr>
-                        <th>Due Date</th>
-                        <th>Amount</th>
-                        <th>Paid Amount</th>
-                        <th>Remaining Amount</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for installment in installments %}
-                        <tr>
-                            <td>{{ installment.due_date|date:"M d, Y" }}</td>
-                            <td>₹{{ installment.amount }}</td>
-                            <td>₹{{ installment.payed_amount }}</td>
-                            <td>
-                                {% if installment.status == 'paid' %}
-                                    ₹0.00
-                                {% else %}
-                                    ₹{{ installment.remaining_amount|floatformat:2 }}
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="status-badge status-{{ installment.status }}">
-                                    {{ installment.get_status_display }}
-                                </span>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5" style="text-align: center; padding: 2rem;">
-                                No installments found for this student.
-                            </td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            
-        </div>
-            <div class="print-section">
-            <a href="{% url 'application:print_receipt_detail' user_franchise.id %}" class="print-button" target="_blank">
-                <span class="iconify" data-icon="mdi:printer" style="font-size: 20px; margin-right: 8px;"></span>
-                Print Receipt
+            {% if payment_just_made %}
+            <a href="{% url 'application:clear_payment_session' franchise_id %}" class="clear-session-link">
+                Clear Payment Session
             </a>
+            {% endif %}
         </div>
+
+
+
+
+        
     </main>
 
     <script>
+        // Dropdown toggle
         const userPanel = document.querySelector('.user-panel');
         const dropdownMenu = document.querySelector('.dropdown-menu');
 
-        // Toggle dropdown on click
         userPanel.addEventListener('click', function(event) {
             event.stopPropagation();
             dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
         });
+        document.addEventListener('click', () => dropdownMenu.style.display = 'none');
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', function() {
-            dropdownMenu.style.display = 'none';
+        // Validate payment form
+        function validatePaymentForm(form) {
+            const amount = parseFloat(form.querySelector('input[name="payment_amount"]').value);
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid positive payment amount.');
+                return false;
+            }
+            return true;
+        }
+
+        // Collapsible sections
+        const collapsibles = document.querySelectorAll('.collapsible');
+        collapsibles.forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('active');
+                const content = this.nextElementSibling;
+                if (content.style.display === 'block') {
+                    content.style.display = 'none';
+                } else {
+                    content.style.display = 'block';
+                }
+            });
         });
 
-        // Function to print payment details
+        // Print Payment Receipt
         function printPaymentDetails() {
-            var button = document.getElementById('payment-print-button');
-            var printUrl = button.getAttribute('data-print-url');
-            if (printUrl) {
-                window.open(printUrl, "_blank");
-            }
+            const button = document.getElementById('payment-print-button');
+            const printUrl = button.getAttribute('data-print-url');
+            if (printUrl) window.open(printUrl, "_blank");
         }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            const printButton = document.getElementById('payment-print-button');
+            if (printButton && !printButton.disabled) {
+                printButton.addEventListener('click', function() {
+                    printPaymentDetails();
+                    setTimeout(() => {
+                        fetch("{% url 'application:clear_payment_session' franchise_id %}")
+                            .then(() => window.location.reload())
+                            .catch(err => console.error(err));
+                    }, 3000);
+                });
+            }
+        });
     </script>
 </body>
 </html>

@@ -1,0 +1,174 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Special Access</title>
+    <link rel="stylesheet" href="{% static 'css/special_access_register.css' %}">
+    <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="navbar-left">
+            <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+        </div>
+        <div class="user-panel">
+            <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+            <span class="user-name">{{ user.username }}</span>
+            <div class="dropdown-menu">
+                <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Reciept</span>
+        </a>
+      </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+      <!-- <div class="menu-item">
+        <a href="#" class="menu-link">
+          <span class="iconify menu-icon" data-icon="mdi:cog"></span>
+          <span class="menu-text">Settings</span>
+        </a>
+      </div> -->
+    </div>
+  </aside>
+
+    <!-- Main Content -->
+    <main class="page-content">
+
+        <div class="register-wrapper">
+      <div class="left-buttons">
+        <a href="{% url 'application:homepage' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+      
+
+      <div class="right-buttons">
+
+       
+      </div>
+    </div>
+
+        <div class="content">
+            <h1>Grant Special Access</h1>
+
+            <div class="forms-container">
+                <div class="form-section">
+                    <div class="form-card">
+                        <h2>Register New User</h2>
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="id_username">Username:</label>
+                                <input type="text" name="username" id="id_username" placeholder="Username" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_full_name">Full Name:</label>
+                                <input type="text" name="full_name" id="id_full_name" placeholder="Full Name" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_email">Email:</label>
+                                <input type="email" name="email" id="id_email" placeholder="Email" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_phone">Phone:</label>
+                                <input type="text" name="phone" id="id_phone" placeholder="Phone Number" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_password">Password:</label>
+                                <input type="password" name="password" id="id_password" placeholder="Password" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="id_mailing_address">Address:</label>
+                                <textarea name="mailing_address" id="id_mailing_address" placeholder="Address" required></textarea>
+                            </div>
+                            <button type="submit" name="register_user" class="register-button">Register User</button>
+                        </form>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <div class="form-card">
+                        <h2> Access to Existing User</h2>
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="form-group">
+                                <label for="{{ form.user.id_for_label }}">Select User:</label>
+                                {{ form.user }}
+                            </div>
+                            <button type="submit" name="grant_access" class="register-button">Grant Access</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <h2>Users with Special Access</h2>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Granted By</th>
+                            <th>Granted At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for special_user in special_users %}
+                        <tr>
+                            <td>{{ special_user.user.username }}</td>
+                            <td>{{ special_user.user.email }}</td>
+                            <td>{% if special_user.granted_by %}{{ special_user.granted_by.username }}{% else %}N/A{% endif %}</td>
+                            <td>{{ special_user.granted_at|date:'d/m/Y' }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const userPanel = document.querySelector('.user-panel');
+        const dropdownMenu = document.querySelector('.dropdown-menu');
+
+        userPanel.addEventListener('click', function(event) {
+            event.stopPropagation();
+            dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.addEventListener('click', function() {
+            dropdownMenu.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth.models import User
 from common.djangoapps.student.models import UserProfile, CourseEnrollment
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from .models import Franchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, Payment, InstallmentTemplate
+from .models import Franchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, Payment, InstallmentTemplate, CourseFee
 
 
 class FranchiseForm(forms.ModelForm):
@@ -73,12 +73,18 @@ class FranchiseUserRegistrationForm(forms.ModelForm):
 
 
 class BatchForm(forms.ModelForm):
+    discount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'placeholder': 'Discount Amount', 'step': '0.01', 'min': '0'})
+    )
+
     class Meta:
         model = Batch
-        fields = ['batch_no', 'fees', 'course']
+        fields = ['batch_no', 'course']
         widgets = {
             'batch_no': forms.TextInput(attrs={'placeholder': 'Batch Number'}),
-            'fees': forms.NumberInput(attrs={'placeholder': 'Fees'}),
             'course': forms.Select(),
         }
 
@@ -113,6 +119,15 @@ class StudentFeeManagementForm(forms.ModelForm):
         fields = ['remaining_amount']
 
 
+class StudentDiscountForm(forms.ModelForm):
+    class Meta:
+        model = StudentFeeManagement
+        fields = ['discount']
+        widgets = {
+            'discount': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': 'Discount Amount'}),
+        }
+
+
 class InstallmentForm(forms.ModelForm):
     class Meta:
         model = Installment
@@ -128,23 +143,23 @@ class InstallmentForm(forms.ModelForm):
 class EditInstallmentForm(forms.ModelForm):
     class Meta:
         model = Installment
-        fields = ['amount', 'payed_amount', 'repayment_period_days']  # Added payed_amount field
+        fields = ['amount', 'payed_amount', 'repayment_period_days']
         widgets = {
             'amount': forms.NumberInput(attrs={'step': '0.01', 'min': '0.01', 'required': 'required'}),
             'payed_amount': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'required': 'required'}),
-            'repayment_period_days': forms.NumberInput(attrs={'min': '1', 'required': 'required'}),
+            'repayment_period_days': forms.NumberInput(attrs={'min': '0', 'required': 'required'}),
         }
-    
+
     def clean_amount(self):
         amount = self.cleaned_data.get('amount')
         if amount is not None and amount <= 0:
             raise forms.ValidationError("Amount must be greater than 0")
         return amount
-    
+
     def clean_repayment_period_days(self):
         days = self.cleaned_data.get('repayment_period_days')
-        if days is not None and days <= 0:
-            raise forms.ValidationError("Repayment period must be at least 1 day")
+        if days is not None and days < 0:  # allow 0
+            raise forms.ValidationError("Repayment period cannot be negative")
         return days
 
 class PaymentForm(forms.ModelForm):
@@ -189,6 +204,15 @@ class StudentEditForm(forms.ModelForm):
         return user
 
 
+class CourseFeeForm(forms.ModelForm):
+    class Meta:
+        model = CourseFee
+        fields = ['fee']
+        widgets = {
+            'fee': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': 'Fee Amount'}),
+        }
+
+
 class UserSearchForm(forms.Form):
     search_query = forms.CharField(
         max_length=100,
@@ -196,3 +220,54 @@ class UserSearchForm(forms.Form):
         label='Search',
         widget=forms.TextInput(attrs={'placeholder': 'Enter registration number, email, phone, or name'})
     )
+
+
+class SpecialAccessRegistrationForm(forms.Form):
+    user = forms.ModelChoiceField(
+        queryset=User.objects.all(),
+        label='Select User',
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+
+
+class SpecialAccessUserRegistrationForm(forms.ModelForm):
+    full_name = forms.CharField(max_length=100, label='Full Name', required=True)
+    email = forms.EmailField(label='Email', required=True)
+    phone = forms.CharField(max_length=20, label='Phone', required=True)
+    password = forms.CharField(widget=forms.PasswordInput, label='Password')
+    mailing_address = forms.CharField(max_length=255, label='Mailing Address', required=True)
+
+    class Meta:
+        model = User
+        fields = ['username']
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Email already exists")
+        return email
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if User.objects.filter(username=username).exists():
+            raise forms.ValidationError("Username already exists")
+        return username
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        name_parts = self.cleaned_data['full_name'].split(' ', 1)
+        user.first_name = name_parts[0]
+        user.last_name = name_parts[1] if len(name_parts) > 1 else ''
+        user.email = self.cleaned_data['email']
+        user.set_password(self.cleaned_data['password'])
+
+        if commit:
+            user.save()
+
+            profile, created = UserProfile.objects.get_or_create(user=user)
+            profile.name = self.cleaned_data['full_name']
+            profile.phone_number = self.cleaned_data['phone']
+            profile.mailing_address = self.cleaned_data['mailing_address']
+            profile.save()
+
+        return user

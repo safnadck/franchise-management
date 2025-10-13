@@ -242,77 +242,27 @@ body {
   margin-left: 250px;
 }
 
-/* Table */
-.table-wrapper {
-  background-color: white;
-  border-radius: 14px;
-  overflow-x: auto;
-  margin: 0 auto;
-}
 
-.data-table {
-  text-align: left;
-  width: 100%;
-  border-collapse: collapse;
-
-}
-.data-table thead {
-  background-color: #16376D;
-  color: white;
-}
-
-.data-table thead th {
-  padding: 13px;
-  text-align: center;
-  font-size: 15px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.data-table tbody td {
- padding: 9px;
-  border-bottom: 1px solid #e0e0e0;
-  font-size: 14px;
-  font-weight: 400;
-  white-space: nowrap;
-}
-
-.data-table tbody tr {
-  background-color:rgba(22, 55, 109, 0.08);
-  border-bottom: 2px solid white;
-}
-
-.data-table td:first-child,
-.data-table th:first-child {
-  text-align: left;
-  padding-left: 40px;
-  width: 0%;
-  white-space: nowrap;
-}
-
-.data-table td:last-child,
-.data-table th:last-child {
-  text-align: right;
-  padding-right: 45px;
-}
-.data-table td:nth-child(2),
-.data-table th:nth-child(2) {
-  width: 25%;
-  padding-right: 500px;
-  text-align: left;
-}
 
 
 
 .btnview {
-  color: #000000;
-  border: 1px solid #16376D;
-  padding: 6px 12px;
-  border-radius: 8px;
-  text-decoration: none;
-  font-size: 13px;
+  background: linear-gradient(120deg, #16376D 50%, rgba(255, 254, 39, 1) 50%);
+  background-size: 200% 200%;
+  background-position: top left;
+  color: #fff;
+  border: none;
+  padding: 16px 26px;
+  border-radius: 14px;
+  font-size: 15px;
   font-weight: 600;
-  transition: background-color 0.3s ease;
+  transition: background-position 0.5s ease, color 0.3s ease;
+  cursor: pointer;
+}
+
+.btnview:hover {
+  background-position: bottom right;
+  color: #16376D;
 }
 
 
@@ -375,6 +325,95 @@ body {
   font-weight: 500;
 }
 
+/* Content Sections */
+.fee-management-section {
+  margin-top: 20px;
+  background-color: white;
+  border-radius: 14px;
+  padding: 2rem;
+  margin-bottom: 1.5rem;
+
+}
+
+.fee-management-section h2 {
+  color: #16376D;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.form-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 20px;
+  justify-content: flex-end;
+}
+
+.fee-input {
+  padding: 8px 0;
+  border: none;
+  border-bottom: 1px solid #ccc;
+  font-size: 14px;
+  font-weight: 600;
+  color: #16376D;
+  background-color: transparent;
+  width: 120px;
+  transition: border-color 0.3s ease;
+}
+
+.fee-input:focus {
+  outline: none;
+  border-bottom-color: #16376D;
+}
+
+.fee-table {
+  width: 100%;
+  border-collapse: collapse;
+  background-color: white;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.fee-table thead {
+  background-color: #16376D;
+  color: white;
+}
+
+.fee-table th,
+.fee-table td {
+  padding: 16px;
+  text-align: left;
+  border-bottom: 1px solid #e0e0e0;
+  font-size: 14px;
+  padding-left: 70px;
+}
+
+.fee-table tbody tr {
+  background-color: rgba(22, 55, 109, 0.08);
+}
+
+.fee-table tbody tr:hover {
+  background-color: rgba(254, 255, 115, 0.57);
+}
+
+.fee-input {
+  padding: 8px 12px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #16376D;
+  width: 120px;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.fee-input:focus {
+  outline: none;
+  border-color: #16376D;
+  box-shadow: 0 0 0 2px rgba(22, 55, 109, 0.2);
+}
+
 /* Responsive */
 @media screen and (max-width: 768px) {
   .page-content {
@@ -382,15 +421,15 @@ body {
     padding: 1rem;
   }
 
-  .data-table {
-    font-size: 14px;
+  .fee-table {
+    font-size: 12px;
   }
 
-  .data-table thead th,
-  .data-table tbody td {
-    padding: 0.75rem;
+  .fee-table th,
+  .fee-table td {
+    padding: 8px;
   }
-  
+
   .edit-btn {
     font-size: 12px;
     padding: 4px 8px;
@@ -399,9 +438,26 @@ body {
   .franchise-details-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .franchise-title {
     font-size: 1.25rem;
+  }
+
+  .fee-management-section {
+    padding: 1rem;
+  }
+
+  .fee-management-section h2 {
+    font-size: 1.25rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+  }
+
+  .form-actions button {
+    width: 100%;
+    text-align: center;
   }
 }
 
