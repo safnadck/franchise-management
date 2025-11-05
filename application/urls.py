@@ -5,6 +5,7 @@ app_name = 'application'
 
 urlpatterns = [
     path('home/', views.homepage, name='homepage'),
+    path('my-profile/', views.student_profile, name='student_profile'),
     path('student-register/', views.user_register, name='user_register'),
     path('enroll-existing-user/', views.enroll_existing_user_general, name='enroll_existing_user_general'),
     path('get-batches/<int:franchise_id>/', views.get_batches, name='get_batches'),
@@ -37,5 +38,13 @@ urlpatterns = [
     path('monthly_fees_report/', views.monthly_fees_report, name='monthly_fees_report'),
     path('combined-fees-report/', views.combined_fees_report, name='combined_fees_report'),
     path('special-access-register/', views.special_access_register, name='special_access_register'),
+    path('special-access-user/<int:user_id>/edit/', views.edit_special_access_user, name='edit_special_access_user'),
+    path('get-batches-for-franchises/', views.get_batches_for_franchises, name='get_batches_for_franchises'),
+    path('get-batch-franchise/<int:batch_id>/', views.get_batch_franchise, name='get_batch_franchise'),  
     path('student-counts/', views.student_counts, name='student_counts'),
+    path('special-dashboard/', views.special_user_dashboard, name='special_user_dashboard'),
+    path('roles/', views.roles, name='roles'),
+    path('roles/<int:group_id>/edit/', views.edit_role, name='edit_role'),
+    path('roles/<int:group_id>/delete/', views.delete_role, name='delete_role'),
+    path('test-email/', views.test_email_config, name='test_email_config'),
 ]

@@ -101,7 +101,7 @@ body {
   overflow: hidden;
 }
 
-.sidebar-menu:hover {
+.sidebar-menu.sidebar-open {
   width: 250px;
 }
 
@@ -124,7 +124,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 0.6rem;
   text-decoration: none;
   color: #16376D;
   gap: 12px;
@@ -132,9 +132,10 @@ body {
   transition: padding 0.3s ease;
 }
 
-.sidebar-menu:not(:hover) .menu-link {
-  padding: 0.6rem 0.6rem;
+.sidebar-menu.sidebar-open .menu-link {
+  padding: 0.6rem 1rem;
 }
+
 
 .menu-icon {
   color: #16376D;
@@ -153,20 +154,46 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.sidebar-menu:hover .menu-text {
+.sidebar-menu.sidebar-open .menu-text {
   opacity: 1;
 }
+
+
+.sidebar-toggle {
+  position: fixed;
+  top: 85px;
+  left: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #fff;
+  border: 1px solid #16376D;
+  color: #16376D;
+  padding: 9px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.sidebar-toggle:hover {
+  background-color: #16376D;
+  color: #fff;
+}
+
 
 /* Page Layout */
 .page-content {
   margin-left: 80px;
-  margin-top: 50px;
+  margin-top: 52px;
   padding: 2rem;
   min-height: calc(100vh - 70px);
   transition: margin-left 0.3s ease;
 }
 
-.sidebar-menu:hover ~ .page-content {
+.sidebar-menu.sidebar-open ~ .page-content {
   margin-left: 250px;
 }
 
@@ -304,7 +331,7 @@ body {
   font-size: 0.875rem;
   min-width: 120px;
   flex-shrink: 0;
-  text-align: right;
+  text-align: left;
 }
 
 .form-card .form-group input,
@@ -320,6 +347,11 @@ body {
   transition: border-color 0.3s ease;
   box-sizing: border-box;
   height: 50px;
+}
+
+.form-card .form-group select option {
+  color: #16376D;
+  background-color: #fff;
 }
 
 .form-card .form-group input::placeholder,
@@ -338,6 +370,11 @@ body {
 .form-card .form-group textarea {
   min-height: 50px;
   resize: vertical;
+}
+
+.form-card select option {
+  color: #fff;
+  background-color: #16376D;
 }
 
 /* Regular Form Fields */
@@ -372,7 +409,7 @@ body {
   border-color: #16376D;
 }
 
-/* Table Section - FIXED VERSION */
+/* Table Section */
 .table-wrapper {
   background-color: white;
   border-radius: 14px;
@@ -387,7 +424,7 @@ body {
   border-collapse: collapse;
   border-radius: 14px;
   overflow: hidden;
-  table-layout: auto; /* Let browser decide width dynamically */
+  table-layout: auto;
 }
 
 .table thead {
@@ -403,7 +440,7 @@ body {
   font-size: 15px;
   font-weight: 600;
   text-align: left;
-  white-space: normal; /* Allow wrapping */
+  white-space: normal;
   border: none;
 }
 
@@ -413,7 +450,7 @@ body {
   font-size: 14px;
   font-weight: 400;
   white-space: normal;
-  word-break: break-word; /* Wrap long emails */
+  word-break: break-word;
 }
 
 .table tbody tr {
@@ -425,52 +462,125 @@ body {
   background-color: rgba(254, 255, 115, 0.57);
 }
 
-/* Responsive Adjustments */
-@media screen and (max-width: 1280px) {
-  .forms-container {
-    flex-direction: column;
-    gap: 1rem;
-  }
+/* ==========================
+   Enhanced Dropdown for Franchise & Batch - UPDATED
+   ========================== */
+
+.dropdown-dark {
+  position: relative;
+  width: 100%;
+  margin-top: 0.5rem;
 }
 
-@media screen and (max-width: 768px) {
-  .page-content {
-    margin-left: 80px;
-    padding: 1rem;
-  }
+.dropdown-dark .dropdown-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255,255,255,0.3);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+  text-align: left;
+}
 
-  .form-card .form-group {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.5rem;
-  }
+.dropdown-dark .dropdown-header.open {
+  border-color: #ffde2b;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
 
-  .form-card .form-group label {
-    text-align: left;
-    min-width: auto;
-  }
+.dropdown-dark .dropdown-text {
+  color: #fff;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
 
-  .form-card .form-group input,
-  .form-card .form-group textarea,
-  .form-card .form-group select {
-    max-width: 100%;
-  }
+.dropdown-dark .dropdown-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  max-height: 230px;
+  overflow-y: auto;
+  background-color: #1f3b6d;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  z-index: 999;
+  text-align: left;
+}
 
-  .table thead th,
-  .table tbody td {
-    font-size: 13px;
-    padding: 8px;
-  }
+.dropdown-dark .dropdown-menu.open {
+  display: block;
+}
 
-  .content {
-    padding: 1rem;
-  }
+.dropdown-dark .dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 10px 15px;
+  font-size: 0.9rem;
+  color: #fff;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.15);
+  transition: background-color 0.2s ease;
+  text-align: left;
+}
 
-  .content h1 {
-    font-size: 1.25rem;
-  }
+.dropdown-dark .dropdown-item:last-child {
+  border-bottom: none;
+}
 
-  .content h2 {
-    font-size: 1.1rem;
-  }
+.dropdown-dark .dropdown-item:hover {
+  background-color: rgba(255, 222, 43, 0.25);
+  color: #fff;
+}
+
+.dropdown-dark .dropdown-item label {
+  cursor: pointer;
+  flex: 1;
+  text-align: left;
+  margin: 0;
+  padding: 0;
+}
+
+.dropdown-dark .select-all-item {
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.dropdown-dark input[type="checkbox"] {
+  accent-color: #ffde2b;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* Form text muted */
+.form-text.text-muted {
+  color: rgba(255, 255, 255, 0.7) !important;
+  font-size: 0.8rem;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+
+.btnview {
+  color: #000000;
+  border: 1px solid #16376D;
+  padding: 6px 12px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
 }

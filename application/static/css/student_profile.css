@@ -33,7 +33,6 @@ body {
 }
 
 .brand-logo {
-  margin-top: 2%;
   width: 150px;
   height: auto;
   max-height: 40px;
@@ -77,19 +76,10 @@ body {
   transition: background 0.2s ease;
 }
 
-.dropdown-menu a:hover {
-  background-color: rgba(22, 55, 109, 0.1);
-}
-
-
-
-
 .user-name {
-  
- font-size: 15px;
+  font-size: 15px;
   text-transform: capitalize;
   font-weight: 700;
- 
 }
 
 .profile {
@@ -99,17 +89,17 @@ body {
 /* Sidebar */
 .sidebar-menu {
   position: fixed;
-  top: 127px;
+  top: 130px;
   left: 20px;
-  width: 80px; 
+  width: 80px; /* collapsed */
   height: calc(100vh - 70px);
   background-color: white;
   transition: width 0.3s ease;
   overflow: hidden;
 }
 
-.sidebar-menu.sidebar-open {
-  width: 250px;
+.sidebar-menu:hover {
+  width: 250px; /* expanded */
 }
 
 .menu-wrapper {
@@ -124,77 +114,14 @@ body {
 }
 
 .menu-item:hover {
-  background-color: rgba(254, 255, 115, 0.57);
+  background-color: rgba(22, 55, 109, 0.2);
 }
-
-.register-wrapper {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  gap: 15px;
-}
-
-.right-buttons {
-  display: flex;
-  gap: 15px;
-}
-
-.left-buttons {
-  display: flex;
-  justify-content: flex-start;
-  margin-right: auto;
-}
-
-.backbutton {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background-color: #fff;
-  border: 1px solid #16376D;
-  color: #16376D;
-  padding: 10px 20px;
-  border-radius: 14px;
-  text-decoration: none;
-  font-size: 15px;
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-}
-
-.register-button {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: linear-gradient(120deg, #16376D 50%, rgba(255, 254, 39, 1) 50%);
-  background-size: 200% 200%;
-  background-position: top left; 
-  color: #fff;
-  padding: 10px 20px;
-  border-radius: 14px;
-  text-decoration: none;
-  font-size: 15px;
-  transition: background-position 0.5s ease, color 0.3s ease;
-}
-
-.register-button:hover {
-  background-position: bottom right; 
-  color: #16376D;
-}
-
-
-
-.plus-icon {
-  font-size: 24px;  
-  font-weight: 700;  
-  line-height: 1;   
-}
-
 
 .menu-link {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.6rem 0.6rem;
+  padding: 0.6rem 1rem;
   text-decoration: none;
   color: #16376D;
   gap: 12px;
@@ -202,8 +129,9 @@ body {
   transition: padding 0.3s ease;
 }
 
-.sidebar-menu.sidebar-open .menu-link {
-  padding: 0.6rem 1rem;
+/* Collapsed: icons centered */
+.sidebar-menu:not(:hover) .menu-link {
+  padding: 0.6rem 0.6rem;
 }
 
 .menu-icon {
@@ -218,30 +146,31 @@ body {
 }
 
 .menu-text {
-  font-weight: 500;
+  font-weight: 600;
   opacity: 0;
   transition: opacity 0.3s ease;
 }
 
-.sidebar-menu.sidebar-open .menu-text {
+/* Show text only on hover */
+.sidebar-menu:hover .menu-text {
   opacity: 1;
 }
 
 /* Main content */
 .page-content {
   margin-left: 80px;
-  margin-top: 50px;
+  margin-top: 70px; /* below navbar */
   padding: 2rem;
   min-height: calc(100vh - 70px);
+  background: #ffffff;
   transition: margin-left 0.3s ease;
 }
 
-.sidebar-menu.sidebar-open ~ .page-content {
+.sidebar-menu:hover ~ .page-content {
   margin-left: 250px;
 }
 
 /* Content Sections */
-.franchise-details-section,
 .student-info-section,
 .franchise-batch-section,
 .fee-management-section {
@@ -252,7 +181,14 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.franchise-title,
+.content h1 {
+  color: #16376D;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
 .student-info-section h2,
 .franchise-batch-section h2,
 .fee-management-section h2 {
@@ -263,14 +199,12 @@ body {
   text-align: left;
 }
 
-.franchise-details-grid,
 .info-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 1rem;
 }
 
-.detail-item,
 .info-item {
   display: flex;
   flex-direction: column;
@@ -279,7 +213,6 @@ body {
   border-radius: 8px;
 }
 
-.detail-label,
 .info-item label {
   font-weight: 600;
   color: #16376D;
@@ -287,81 +220,10 @@ body {
   margin-bottom: 0.25rem;
 }
 
-.detail-value,
 .info-item span {
   color: #333;
   font-size: 1rem;
   font-weight: 500;
-}
-
-.info-item form {
-  margin-top: 10px;
-}
-
-.info-item button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: none;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-/* --- Standard Button Design Alternative --- */
-
-.enroll-btn-alt {
-  background-color: #ffffff;
-  color: rgba(12, 158, 12, 0.664);
-  border: 2px solid rgba(12, 158, 12, 0.664);
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.enroll-btn-alt:hover {
-  background-color: rgba(12, 158, 12, 0.664);
-  color: white;
-}
-
-.unenroll-btn-alt {
-  background-color: #ffffff;
-  color: rgba(248, 26, 26, 0.699);
-  border: 2px solid rgba(248, 26, 26, 0.699);;
-  border-radius: 8px;
-  padding: 8px 16px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.3s ease, color 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.unenroll-btn-alt:hover {
-  background-color: rgba(248, 26, 26, 0.699);;
-  color: white;
-}
-
-
-
-.fee-summary {
-  margin-bottom: 20px;
-}
-
-.fee-summary p {
-  margin: 5px 0;
-  font-size: 16px;
 }
 
 .fee-table {
@@ -386,7 +248,6 @@ body {
   text-align: left;
   padding-right: -20px;  /* adjust as needed */
 }
-
 
 .fee-table thead {
   background-color: #16376D;
@@ -419,79 +280,9 @@ body {
   font-weight: 600;
 }
 
-
-
-.viewstudent {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #16376D;
-  padding: 10px 20px;
-  border-radius: 14px;
-  text-decoration: none;
-  font-size: 15px;
-  border: 1px solid #16376D;
-  font-weight: 600;
-  transition: background-color 0.3s ease;
+.franchise-batch-section p,
+.fee-management-section p {
+  font-size: 16px;
+  color: #777;
+  margin-top: 1rem;
 }
-
-.viewstudent:hover {
-  background-color: #16376D;
-  color: white;
-}
-
-.sidebar-toggle {
-  position: fixed;
-  top: 85px;
-  left: 35px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  background-color: #fff;
-  border: 1px solid #16376D;
-  color: #16376D;
-  padding: 9px 14px;
-  border-radius: 14px;
-  font-size: 15px;
-  font-weight: 600;
-  transition: background-color 0.3s ease;
-  cursor: pointer;
-  z-index: 1001;
-}
-
-.sidebar-toggle:hover {
-  background-color: #16376D;
-  color: #fff;
-}
-
-/* Responsive */
-@media screen and (max-width: 768px) {
-  .page-content {
-    margin-left: 80px;
-    padding: 1rem;
-  }
-
-  .franchise-details-grid,
-  .info-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .franchise-title,
-  .student-info-section h2,
-  .franchise-batch-section h2,
-  .fee-management-section h2 {
-    font-size: 1.25rem;
-  }
-
-  .fee-table {
-    font-size: 12px;
-  }
-
-  .fee-table th,
-  .fee-table td {
-    padding: 8px;
-  }
-}
-
-
-

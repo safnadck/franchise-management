@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
 
@@ -22,7 +23,7 @@ class Franchise(models.Model):
         return self.name
 
 
-class UserFranchise(models.Model):
+class UserFranchise(models.Model):  #student details
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     franchise = models.ForeignKey(Franchise, on_delete=models.SET_NULL, null=True, blank=True)
     batch = models.ForeignKey("Batch", on_delete=models.SET_NULL, null=True, blank=True)
@@ -141,9 +142,34 @@ class Payment(models.Model):
 
 
 class SpecialAccessUser(models.Model):
+    PERMISSION_CHOICES = [
+        ('all', 'All Permissions'),
+        ('franchise_management', 'Franchise Management'),
+        ('fee_management', 'Fee Management'),
+        ('student_management', 'Student Management'),
+        ('reporting', 'Reporting'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='special_access')
+    permission_type = models.CharField(
+        max_length=50,
+        choices=PERMISSION_CHOICES,
+        default='all'
+    )
+    allowed_franchises = models.ManyToManyField(Franchise, blank=True, related_name='special_access_users')
+    allowed_batches = models.ManyToManyField(Batch, blank=True, related_name='special_access_users')
     granted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='granted_accesses')
     granted_at = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        permissions = [
+            ('view_dashboard', 'Can view dashboard'),
+            ('view_reports', 'Can view reports'),
+            ('view_profile', 'Can view profile'),
+            ('manage_roles', 'Can manage roles'),
+            ('manage_users', 'Can manage users'),
+            ('process_payment', 'Can process payments'),
+        ]
+
     def __str__(self):
-        return f"Special Access for {self.user.username}"
+        return f"Special Access for {self.user.username} - {self.get_permission_type_display()}"

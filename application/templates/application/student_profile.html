@@ -1,0 +1,116 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Profile</title>
+    <link rel="stylesheet" href="{% static 'css/student_profile.css' %}">
+    <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+<body>
+
+    <!-- Main Content -->
+
+        <div class="content">
+
+            <!-- Personal Information Section -->
+            <div class="student-info-section">
+                <h2>Personal Information</h2>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <label>Full Name</label>
+                        <span>{{ user.get_full_name }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Username</label>
+                        <span>{{ user.username }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Joined Date</label>
+                        <span>{{ user.date_joined|date:"M d, Y" }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Email</label>
+                        <span>{{ user.email }}</span>
+                    </div>
+                    <div class="info-item">
+                        <label>Phone Number</label>
+                        <span>{{ phone_number|default:"N/A" }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Enrolled Courses Section -->
+            <div class="franchise-batch-section">
+                <h2>Enrolled Courses</h2>
+                {% if enrolled_courses %}
+                    <table class="fee-table">
+                        <thead>
+                            <tr>
+                                <th>Course Name</th>
+                                <th>Enrollment Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for course in enrolled_courses %}
+                                <tr>
+                                    <td>{{ course.course.display_name }}</td>
+                                    <td>{{ course.enrollment_date }}</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                {% else %}
+                    <p>No enrolled courses.</p>
+                {% endif %}
+            </div>
+
+            <!-- Installments Sections -->
+            {% for uf_data in user_franchise_data %}
+                <div class="fee-management-section">
+                    <h2>Installments for {{ uf_data.user_franchise.batch.course.display_name }} ({{ uf_data.user_franchise.franchise.name }} - {{ uf_data.user_franchise.batch.batch_no }})</h2>
+                    {% if uf_data.installments %}
+                        <table class="fee-table">
+                            <thead>
+                                <tr>
+                                    <th>Due Date</th>
+                                    <th>Amount</th>
+                                    <th>Paid Amount</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for installment in uf_data.installments %}
+                                    <tr>
+                                        <td>{{ installment.due_date }}</td>
+                                        <td>₹{{ installment.amount }}</td>
+                                        <td>₹{{ installment.payed_amount }}</td>
+                                        <td class="{% if installment.status == 'paid' %}status-paid{% elif installment.status == 'pending' %}status-pending{% endif %}">{{ installment.get_status_display }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    {% else %}
+                        <p>No installments found.</p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+
+
+    <script>
+        const userPanel = document.querySelector('.user-panel');
+        const dropdownMenu = document.querySelector('.dropdown-menu');
+
+        userPanel.addEventListener('click', function (event) {
+            event.stopPropagation();
+            dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.addEventListener('click', function () {
+            dropdownMenu.style.display = 'none';
+        });
+    </script>
+</body>
+</html>

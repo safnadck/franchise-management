@@ -1,4 +1,5 @@
 {% load static %}
+{% load permission_tags %}
 <!DOCTYPE html>
 <html>
 <head>
@@ -26,43 +27,34 @@
     </div>
 </header>
 
-<aside class="sidebar-menu">
+  <aside class="sidebar-menu">
     <div class="menu-wrapper">
-        <div class="menu-item">
-            <a href="{% url 'application:franchise_list' %}" class="menu-link">
-                <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
-                <span class="menu-text">Franchise</span>
-            </a>
-        </div>
-        <div class="menu-item">
+      {% if show_reports_button %}
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+      {% endif %}
+      {% if show_franchise_button %}
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      {% endif %}
+      {% if show_receipt_button %}
+      <div class="menu-item">
         <a href="{% url 'application:receipt_search' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
           <span class="menu-text">Reciept</span>
         </a>
       </div>
-
-       <div class="menu-item">
-        <a href="{% url 'application:user_register' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
-          <span class="menu-text">Registration</span>
-        </a>
-      </div>
-      
-        <div class="menu-item">
-            <a href="{% url 'application:homepage' %}" class="menu-link">
-                <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
-                <span class="menu-text">Reports</span>
-            </a>
-        </div>
-        
-        <!-- <div class="menu-item">
-            <a href="#" class="menu-link">
-                <span class="iconify menu-icon" data-icon="mdi:cog"></span>
-                <span class="menu-text">Settings</span>
-            </a>
-        </div> -->
+      {% endif %}
     </div>
-</aside>
+  </aside>
 
 <main class="page-content">
     <div class="register-wrapper">
@@ -70,6 +62,9 @@
             <a href="{% url 'application:student_fee_management' franchise.pk batch.pk user.pk %}" class="backbutton">
                 <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
             </a>
+                       <button class="sidebar-toggle">
+      <span class="iconify" data-icon="mdi:menu" style="font-size: 20px;"></span>
+        </button>
         </div>
     </div>
     
@@ -79,10 +74,14 @@
         <div class="info-box">
             <p><strong>Batch:</strong> {{ batch.batch_no }} - {{ batch.course.display_name }}</p>
             <p><strong>Total Fees:</strong> ₹{{ batch.fees }}</p>
-            <p><strong>Discount:</strong> ₹{{ student_fee.discount }}</p>
-            <p><strong>Student Remaining Amount:</strong> ₹{{ student_fee.remaining_amount }}</p>
+            <p><strong>Batch Discount:</strong> ₹{{ batch_discount }}</p>
+            <p><strong>Additional Discount:</strong> ₹{{ additional_discount }}</p>
+            <p><strong>Total Discount:</strong> ₹{{ total_discount }}</p>
+            <p><strong>Net Payable Amount:</strong> ₹{{ student_fee.remaining_amount }}</p>
             <p><strong>Registration Date:</strong> {{ enrollment.created.date }}</p>
+            <p></p>
         </div>
+
 
       
 
@@ -106,11 +105,11 @@
             <form method="post" class="discount-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="save_discount">
-                <label for="{{ discount_form.discount.id_for_label }}">Discount Amount (₹):</label>
-                {{ discount_form.discount }}
-                {% if discount_form.discount.errors %}
+                <label for="{{ discount_form.additional_discount.id_for_label }}">{{ discount_form.additional_discount.label }}</label>
+                {{ discount_form.additional_discount }}
+                {% if discount_form.additional_discount.errors %}
                     <div class="form-errors">
-                        {% for error in discount_form.discount.errors %}
+                        {% for error in discount_form.additional_discount.errors %}
                             {{ error }}
                         {% endfor %}
                     </div>
@@ -136,7 +135,9 @@
                 <thead>
                     <tr>
                         <th>Amount (₹)</th>
-                        <th>Repayment Days</th>
+                        <th>Paid within (days)</th>
+                        <th>Paid Amount (₹)</th>
+                        
                         <th>Due Date</th>
                         <th>Status</th>
                         <th>Delete</th>
@@ -161,7 +162,7 @@
                     </div>
                 {% endif %}
             </td>
-            <td>
+             <td>
                 {% if form.instance.status == "paid" %}
                     <span>{{ form.instance.repayment_period_days }}</span>
                     <input type="hidden" name="{{ form.repayment_period_days.html_name }}" value="{{ form.instance.repayment_period_days }}">
@@ -176,6 +177,15 @@
                     </div>
                 {% endif %}
             </td>
+            <td>
+                {% if form.instance.status == "paid" %}
+                    <span>{{ form.instance.payed_amount }}</span>
+                    <input type="hidden" name="{{ form.payed_amount.html_name }}" value="{{ form.instance.payed_amount }}">
+                {% else %}
+                    <span>{{ form.instance.payed_amount|default:"0.00" }}</span>
+                {% endif %}
+            </td>
+           
             <td>
                 {% if form.instance.due_date %}
                     {{ form.instance.due_date }}
@@ -226,6 +236,8 @@
             ← Back to Fee Management
         </a>
     </div>
+
+
 </main>
 
 <script>
@@ -281,6 +293,7 @@
             }
         }
 
+        
         // Function to add event listeners to an input
         function addInputListeners(input) {
             if (input.name.includes('amount')) {
@@ -325,22 +338,30 @@
             const newRow = document.createElement('tr');
             newRow.className = 'installment-row';
             newRow.innerHTML = `
-                <td>
+
+                 <td>
                     <input type="number" step="0.01" min="0.01" name="form-${formCount}-amount"
-                           id="id_form-${formCount}-amount" required placeholder="0.00"
+                           id="id_form-${formCount}-amount" placeholder="0.00"
                            class="amount-input">
                 </td>
+                
                 <td>
                     <input type="number" min="0" name="form-${formCount}-repayment_period_days"
-                           id="id_form-${formCount}-repayment_period_days" required placeholder="Days"
+                           id="id_form-${formCount}-repayment_period_days" placeholder="Days"
                            class="days-input">
                 </td>
+
+                <td>
+                    <span>0.00</span>
+                </td>
+
+
+               
+                
                 <td><em>Will be calculated after save</em></td>
                 <td>Pending</td>
                 <td style="text-align: center;">
                     <input type="hidden" name="form-${formCount}-DELETE" value="">
-                    <input type="checkbox" name="form-${formCount}-DELETE"
-                           id="id_form-${formCount}-DELETE" style="display: none;">
                     <button type="button" class="delete-button" data-row-id="${formCount}">
                         <span class="iconify" data-icon="mdi:delete" style="font-size: 16px;"></span>
                         Delete
@@ -469,11 +490,13 @@
         // Add installment button
         addButton.addEventListener('click', addInstallmentRow);
 
+
+
         // Form submission validation
         const form = document.getElementById('installment-form');
         form.addEventListener('submit', function(event) {
             let hasErrors = false;
-            
+
             // Validate individual fields
             document.querySelectorAll('.amount-input, .days-input').forEach(input => {
                 if (!input.checkValidity()) {
@@ -485,12 +508,11 @@
                 }
             });
 
-            // Check if total exceeds remaining amount
+            // Check if total matches remaining amount exactly
             const total = parseFloat(realtimeTotalSpan.textContent);
-            if (total > remainingAmount) {
+            if (total !== remainingAmount) {
                 event.preventDefault();
-                alert('Total installment amount cannot exceed remaining amount. Please adjust your installments.');
-                hasErrors = true;
+                 alert('Total installment amount must equal remaining amount. Please adjust the installment amounts.');                hasErrors = true;
             }
 
             if (hasErrors) {
@@ -506,6 +528,8 @@
     // User panel dropdown functionality
     const userPanel = document.querySelector('.user-panel');
     const dropdownMenu = document.querySelector('.dropdown-menu');
+    const sidebar = document.querySelector('.sidebar-menu');
+    const toggleButton = document.querySelector('.sidebar-toggle');
 
     // Toggle dropdown on click
     userPanel.addEventListener('click', function(event) {
@@ -530,6 +554,20 @@
             }
         });
     });
+
+
+    // Toggle sidebar on button click
+    toggleButton.addEventListener('click', function() {
+      sidebar.classList.toggle('sidebar-open');
+      const icon = toggleButton.querySelector('.iconify');
+      if (sidebar.classList.contains('sidebar-open')) {
+        icon.setAttribute('data-icon', 'mdi:close');
+      } else {
+        icon.setAttribute('data-icon', 'mdi:menu');
+      }
+    });
+
+
 });
 </script>
 

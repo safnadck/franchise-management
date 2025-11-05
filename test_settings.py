@@ -30,6 +30,14 @@ DATABASES = {
     }
 }
 
+DEBUG = True
+
+# Email settings are handled by the main Open edX application
+# Do not override here to ensure compatibility with production email setup
+
+
+ALLOWED_HOSTS = []
+
 INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.auth',

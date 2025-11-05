@@ -1,0 +1,363 @@
+{% load static %}
+{% load permission_tags %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Edit Role</title>
+  <link rel="stylesheet" href="{% static 'css/roles.css' %}">
+  <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+
+<body>
+
+  <!-- Navbar -->
+  <header class="navbar">
+    <div class="navbar-left">
+      <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+    </div>
+
+    <div class="user-panel">
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
+
+      <div class="dropdown-menu">
+        <a href="{% url 'application:student_profile' %}" class="profile-link">My Profile</a>
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+        
+
+
+                {% if user|can_access:'view_dashboard' %}
+        <div class="menu-item">
+            <a href="{% url 'application:homepage' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+                <span class="menu-text">Reports</span>
+            </a>
+        </div>
+        {% endif %}
+
+        
+        {% if user|can_access:'view_franchise' %}
+        <div class="menu-item">
+            <a href="{% url 'application:franchise_list' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+                <span class="menu-text">Franchise</span>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if user|can_access:'process_payment' %}
+        <div class="menu-item">
+            <a href="{% url 'application:receipt_search' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+                <span class="menu-text">Receipt</span>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if user|can_access:'add_userfranchise' %}
+        <div class="menu-item">
+            <a href="{% url 'application:user_register' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+                <span class="menu-text">Registration</span>
+            </a>
+        </div>
+        {% endif %}
+
+        {% if user|can_access:'auth.change_group' %}
+        <div class="menu-item">
+            <a href="{% url 'application:roles' %}" class="menu-link">
+                <span class="iconify menu-icon" data-icon="mdi:account-group"></span>
+                <span class="menu-text">Roles</span>
+            </a>
+        </div>
+        {% endif %}
+
+
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="page-content">
+    <div class="register-wrapper">
+      <div class="left-buttons">
+        <a href="{% url 'application:roles' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+        <button class="sidebar-toggle">
+          <span class="iconify" data-icon="mdi:menu" style="font-size: 20px;"></span>
+        </button>
+      </div>
+
+      <div class="right-buttons">
+        <!-- Right buttons can go here if needed -->
+      </div>
+    </div>
+
+    <!-- Display Messages -->
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="custom-alert custom-alert-{{ message.tags }}">
+            {{ message }}
+            <button type="button" class="alert-close" onclick="this.parentElement.style.display='none';">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="content-wrapper">
+        <!-- Edit Role Form -->
+        <div class="form-section">
+            <div class="form-card">
+                <div class="form-header">
+                    <h5 id="form-title">Edit Role</h5>
+                </div>
+                <div class="form-body">
+                    <form method="post" id="roleForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="group_id" name="group_id" value="{{ group.id }}">
+
+                        <div class="form-group role-name-group">
+                            <label for="{{ form.name.id_for_label }}">Role Name</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                                <div class="text-danger">
+                                    {% for error in form.name.errors %}
+                                        <small>{{ error }}</small>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <label>Permissions</label>
+                            <div class="permissions-cards">
+                                {% regroup permissions by content_type.model as permissions_by_model %}
+                                {% for model in permissions_by_model %}
+                                {% if model.grouper != 'installmenttemplate' and model.grouper != 'payment' %}
+                                <div class="model-section">
+                                    <strong class="model-title">
+                                        {% if model.grouper == 'userfranchise' %}
+                                        Student Details
+                                        {% else %}
+                                        {{ model.grouper|title|cut:"_"|title }}
+                                        {% endif %}
+                                    </strong>
+                                    <div class="permissions-grid">
+                                        {% for permission in model.list %}
+                                        {% if model.grouper == 'specialaccessuser' %}
+                                        {% with label=permission.name|cut:"Can "|cut:model.grouper|cut:"_"|title %}
+                                        {% if label != 'View Profile' and label != 'Manage Roles' %}
+                                        <div class="permission-card">
+                                            <input class="form-check-input" type="checkbox" name="permissions"
+                                                value="{{ permission.id }}" id="perm_{{ permission.id }}" {% if permission in group.permissions.all %}checked{% endif %}>
+                                            <label class="form-check-label" for="perm_{{ permission.id }}">
+                                                {{ label }}
+                                            </label>
+                                        </div>
+                                        {% endif %}
+                                        {% endwith %}
+                                        {% elif model.grouper == 'franchise' %}
+                                        {% with label=permission.name|cut:"Can "|cut:model.grouper|cut:"_"|title %}
+                                        {% if label != 'Access Special Admin Features' %}
+                                        <div class="permission-card">
+                                            <input class="form-check-input" type="checkbox" name="permissions"
+                                                value="{{ permission.id }}" id="perm_{{ permission.id }}" {% if permission in group.permissions.all %}checked{% endif %}>
+                                            <label class="form-check-label" for="perm_{{ permission.id }}">
+                                                {{ label }}
+                                            </label>
+                                        </div>
+                                        {% endif %}
+                                        {% endwith %}
+                                        {% else %}
+                                        <div class="permission-card">
+                                            <input class="form-check-input" type="checkbox" name="permissions"
+                                                value="{{ permission.id }}" id="perm_{{ permission.id }}" {% if permission in group.permissions.all %}checked{% endif %}>
+                                            <label class="form-check-label" for="perm_{{ permission.id }}">
+                                                {% if model.grouper == 'userfranchise' %}
+                                                {% if 'add' in permission.name %}Add Student Details{% elif 'change' in permission.name %}Change Student Details{% elif 'delete' in permission.name %}Delete Student Details{% elif 'view' in permission.name %}View Student Details{% else %}{{ permission.name|cut:"Can"|cut:model.grouper|cut:"_"|title }}{% endif %}
+                                                {% else %}
+                                                {{ permission.name|cut:"Can"|cut:model.grouper|cut:"_"|title }}
+                                                {% endif %}
+                                            </label>
+                                        </div>
+                                        {% endif %}
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                            {% if form.permissions.errors %}
+                            <div class="text-danger">
+                                {% for error in form.permissions.errors %}
+                                <small>{{ error }}</small>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn-primary">Update Role</button>
+                            <a href="{% url 'application:roles' %}" class="btn-secondary">Cancel</a>
+                           
+                            <button type="button" class="btn-danger" id="deleteRoleBtn">Delete Role</button>
+                       
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="custom-modal" id="deleteRoleModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteRoleModalLabel">Confirm Delete</h5>
+                <button type="button" class="modal-close" onclick="document.getElementById('deleteRoleModal').style.display='none';">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete the role "<strong>{{ group.name }}</strong>"?</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" onclick="document.getElementById('deleteRoleModal').style.display='none';">Cancel</button>
+                <button type="button" class="btn-danger" id="confirmDelete">Delete Role</button>
+            </div>
+        </div>
+    </div>
+  </main>
+
+  <script>
+    const userPanel = document.querySelector('.user-panel');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+    const sidebar = document.querySelector('.sidebar-menu');
+    const toggleButton = document.querySelector('.sidebar-toggle');
+
+    // Toggle dropdown on click
+    userPanel.addEventListener('click', function (event) {
+      event.stopPropagation(); // prevent click from bubbling
+      dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function () {
+      dropdownMenu.style.display = 'none';
+    });
+
+    // Toggle sidebar on button click
+    toggleButton.addEventListener('click', function () {
+        sidebar.classList.toggle('sidebar-open');
+        const icon = toggleButton.querySelector('.iconify');
+        if (sidebar.classList.contains('sidebar-open')) {
+            icon.setAttribute('data-icon', 'mdi:close');
+        } else {
+            icon.setAttribute('data-icon', 'mdi:menu');
+        }
+    });
+  </script>
+
+  <script>
+$(document).ready(function() {
+    // Permission search functionality
+    $('#permissionSearch').on('keyup', function() {
+        var searchText = $(this).val().toLowerCase();
+        $('.permission-item').each(function() {
+            var permissionText = $(this).text().toLowerCase();
+            if (permissionText.indexOf(searchText) > -1) {
+                $(this).show();
+                $(this).closest('.model-section').show();
+            } else {
+                $(this).hide();
+            }
+        });
+
+        // Hide empty categories
+        $('.model-section').each(function() {
+            var visibleItems = $(this).find('.permission-item:visible').length;
+            if (visibleItems === 0) {
+                $(this).hide();
+            } else {
+                $(this).show();
+            }
+        });
+    });
+
+    // Delete role functionality
+    $('#deleteRoleBtn').click(function() {
+        $('#deleteRoleModal').show();
+    });
+
+    // Confirm delete
+    $('#confirmDelete').click(function() {
+        $.ajax({
+            url: '{% url "application:delete_role" group.id %}',
+            type: 'POST',
+            data: {
+                'csrfmiddlewaretoken': '{{ csrf_token }}'
+            },
+            success: function(data) {
+                if (data.success) {
+                    window.location.href = '{% url "application:roles" %}';
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            },
+            error: function(xhr) {
+                alert('Error deleting role: ' + xhr.responseText);
+            }
+        });
+    });
+
+    // Form submission
+    $('#roleForm').on('submit', function(e) {
+        e.preventDefault();
+
+        var formData = $(this).serialize();
+        var url = '{% url "application:edit_role" group.id %}';
+
+        $.ajax({
+            url: url,
+            type: 'POST',
+            data: formData,
+            success: function(data) {
+                if (data.success) {
+                    window.location.href = '{% url "application:roles" %}';
+                } else {
+                    // Display form errors
+                    alert('Error: ' + JSON.stringify(data.errors));
+                }
+            },
+            error: function(xhr) {
+                alert('Error saving role');
+            }
+        });
+    });
+
+    // Reset form on page load
+    function resetForm() {
+        $('#permissionSearch').val('');
+        $('.permission-item').show();
+        $('.model-section').show();
+    }
+
+    resetForm();
+});
+</script>
+
+
+
+</body>
+</html>

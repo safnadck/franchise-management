@@ -5,7 +5,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grant Special Access</title>
+    <title>Edit Special Access User</title>
     <link rel="stylesheet" href="{% static 'css/special_access_register.css' %}">
     <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
 </head>
@@ -37,7 +37,7 @@
         </a>
       </div>
       {% endif %}
-      
+
       <!-- Franchise Menu -->
       {% if user|can_access:"view_franchise" or user.is_superuser %}
       <div class="menu-item">
@@ -65,7 +65,7 @@
     <main class="page-content">
         <div class="register-wrapper">
             <div class="left-buttons">
-                <a href="{% url 'application:homepage' %}" class="backbutton">
+                <a href="{% url 'application:special_access_register' %}" class="backbutton">
                     <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
                 </a>
                  <button class="sidebar-toggle">
@@ -78,42 +78,14 @@
         </div>
 
         <div class="content">
-            <h1>Grant Special Access</h1>
+            <h1>Edit Special Access for {{ special_access_user.user.username }}</h1>
 
             <div class="forms-container">
                 <div class="form-section">
                     <div class="form-card">
-                        <h2>Register New User with Special Access</h2>
+                        <h2>Edit Allowed Franchises and Batches</h2>
                         <form method="post">
                             {% csrf_token %}
-                            <div class="form-group">
-                                <label for="id_username">Username:</label>
-                                <input type="text" name="username" id="id_username" placeholder="Enter username" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="id_full_name">Full Name:</label>
-                                <input type="text" name="full_name" id="id_full_name" placeholder="Enter full name" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="id_email">Email:</label>
-                                <input type="email" name="email" id="id_email" placeholder="Enter email address" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="id_phone">Phone:</label>
-                                <input type="text" name="phone" id="id_phone" placeholder="Enter phone number" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="id_password">Password:</label>
-                                <input type="password" name="password" id="id_password" placeholder="Create a password" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="id_mailing_address">Address:</label>
-                                <textarea name="mailing_address" id="id_mailing_address" placeholder="Enter mailing address" required></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="{{ form.group.id_for_label }}">Role:</label>
-                                {{ form.group }}
-                            </div>
                             <div class="form-group">
                                 <label>Franchises:</label>
                                 <div class="dropdown-container dropdown-dark">
@@ -158,38 +130,10 @@
                                 </div>
                                 <small class="form-text text-muted">Leave empty to grant access to all batches (filtered by selected franchises)</small>
                             </div>
-                            <button type="submit" class="register-button">Register User</button>
+                            <button type="submit" class="register-button">Update Access</button>
                         </form>
                     </div>
                 </div>
-            </div>
-
-            <h2>Users with Special Access</h2>
-            <div class="table-wrapper">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Granted By</th>
-                            <th>Granted At</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for special_user in special_users %}
-                        <tr>
-                            <td>{{ special_user.user.username }}</td>
-                            <td>{{ special_user.user.email }}</td>
-                            <td>{% if special_user.granted_by %}{{ special_user.granted_by.username }}{% else %}N/A{% endif %}</td>
-                            <td>{{ special_user.granted_at|date:'d/m/Y' }}</td>
-                            <td>
-                                <a href="{% url 'application:edit_special_access_user' special_user.user.id %}" class="btn btn-primary btn-sm btnview">Edit</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
             </div>
         </div>
     </main>
@@ -286,7 +230,7 @@
         function updateFranchiseDropdownText() {
             const selectedFranchises = Array.from(franchiseCheckboxes).filter(cb => cb.checked);
             const dropdownText = franchiseDropdownHeader.querySelector('.dropdown-text');
-            
+
             if (selectedFranchises.length === 0) {
                 dropdownText.textContent = 'Select franchises';
             } else if (selectedFranchises.length === franchiseCheckboxes.length) {
@@ -302,7 +246,7 @@
                 // Update select all checkbox state
                 const allChecked = Array.from(franchiseCheckboxes).every(cb => cb.checked);
                 selectAllFranchises.checked = allChecked;
-                
+
                 updateFranchiseDropdownText();
                 filterBatchesByFranchises(); // Update batches based on franchise selection
             });
@@ -338,12 +282,12 @@
 
         // Update batch dropdown text based on selection
         function updateBatchDropdownText() {
-            const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb => 
+            const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb =>
                 cb.closest('.dropdown-item').style.display !== 'none'
             );
             const selectedBatches = visibleBatchCheckboxes.filter(cb => cb.checked);
             const dropdownText = batchDropdownHeader.querySelector('.dropdown-text');
-            
+
             if (selectedBatches.length === 0) {
                 dropdownText.textContent = 'Select batches';
             } else if (selectedBatches.length === visibleBatchCheckboxes.length) {
@@ -356,13 +300,13 @@
         // Add event listeners to batch checkboxes
         batchCheckboxes.forEach(checkbox => {
             checkbox.addEventListener('change', function() {
-                // Update select all checkbox state
-                const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb => 
+                // Update batch select all checkbox state
+                const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb =>
                     cb.closest('.dropdown-item').style.display !== 'none'
                 );
                 const allChecked = visibleBatchCheckboxes.every(cb => cb.checked);
                 selectAllBatches.checked = allChecked;
-                
+
                 updateBatchDropdownText();
             });
         });
@@ -375,9 +319,9 @@
             const selectedFranchiseIds = Array.from(franchiseCheckboxes)
                 .filter(cb => cb.checked)
                 .map(cb => cb.value);
-            
+
             const batchItems = document.querySelectorAll('#batchDropdownMenu .dropdown-item:not(.select-all-item)');
-            
+
             if (selectedFranchiseIds.length === 0) {
                 // If no franchises selected, show all batches
                 batchItems.forEach(item => {
@@ -388,7 +332,7 @@
                 batchItems.forEach(item => {
                     const franchiseId = item.getAttribute('data-franchise-id');
                     const batchCheckbox = item.querySelector('input[type="checkbox"]');
-                    
+
                     if (franchiseId && selectedFranchiseIds.includes(franchiseId)) {
                         item.style.display = 'flex';
                     } else {
@@ -399,7 +343,7 @@
                     }
                 });
             }
-            
+
             // Update batch dropdown text and select all state
             updateBatchDropdownText();
             updateBatchSelectAllState();
@@ -407,10 +351,10 @@
 
         // Update batch select all checkbox state
         function updateBatchSelectAllState() {
-            const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb => 
+            const visibleBatchCheckboxes = Array.from(batchCheckboxes).filter(cb =>
                 cb.closest('.dropdown-item').style.display !== 'none'
             );
-            
+
             if (visibleBatchCheckboxes.length === 0) {
                 selectAllBatches.checked = false;
                 selectAllBatches.disabled = true;

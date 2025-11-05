@@ -1,0 +1,275 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grant Special Access</title>
+    <link rel="stylesheet" href="{% static 'css/special_access_register.css' %}">
+    <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
+</head>
+<body>
+    <!-- Navbar -->
+    <header class="navbar">
+        <div class="navbar-left">
+            <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
+        </div>
+        <div class="user-panel">
+            <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+            <span class="user-name">{{ user.username }}</span>
+            <div class="dropdown-menu">
+                <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar-menu">
+    <div class="menu-wrapper">
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Reciept</span>
+        </a>
+      </div>
+
+       <div class="menu-item">
+        <a href="{% url 'application:user_register' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
+          <span class="menu-text">Registration</span>
+        </a>
+      </div>
+      
+      <div class="menu-item">
+        <a href="{% url 'application:special_user_dashboard' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="material-symbols:dashboard"></span>
+          <span class="menu-text">Dashboard</span>
+        </a>
+      </div>
+      <div class="menu-item">
+        <a href="{% url 'application:homepage' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
+          <span class="menu-text">Reports</span>
+        </a>
+      </div>
+      <!-- <div class="menu-item">
+        <a href="#" class="menu-link">
+          <span class="iconify menu-icon" data-icon="mdi:cog"></span>
+          <span class="menu-text">Settings</span>
+        </a>
+      </div> -->
+    </div>
+  </aside>
+
+    <!-- Main Content -->
+    <main class="page-content">
+
+        <div class="register-wrapper">
+      <div class="left-buttons">
+        <a href="{% url 'application:homepage' %}" class="backbutton">
+          <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
+        </a>
+      </div>
+      
+      <div class="right-buttons">
+        <!-- Optional: Add any right-side buttons if needed -->
+      </div>
+    </div>
+
+        <div class="content">
+            <h1>Grant Special Access</h1>
+
+            <!-- Display messages -->
+            {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <div class="forms-container">
+                <div class="form-section">
+                    <div class="form-card">
+                        <h2>Register New User with Special Access</h2>
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <!-- Display form errors -->
+                            {% if form.errors %}
+                            <div class="form-errors">
+                                {% for field in form %}
+                                    {% for error in field.errors %}
+                                        <div class="error">{{ error }}</div>
+                                    {% endfor %}
+                                {% endfor %}
+                                {% for error in form.non_field_errors %}
+                                    <div class="error">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <div class="form-group">
+                                <label for="id_username">Username:</label>
+                                {{ form.username }}
+                                {% if form.username.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.username.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_email">Email:</label>
+                                {{ form.email }}
+                                {% if form.email.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.email.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_password">Password:</label>
+                                {{ form.password }}
+                                {% if form.password.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.password.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_password_confirm">Confirm Password:</label>
+                                {{ form.password_confirm }}
+                                {% if form.password_confirm.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.password_confirm.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_permission_type">Permission Type:</label>
+                                {{ form.permission_type }}
+                                {% if form.permission_type.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.permission_type.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                <small class="help-text">
+                                    Choose the type of access this user should have
+                                </small>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="id_group">Group (Role):</label>
+                                {{ form.group }}
+                                {% if form.group.errors %}
+                                <div class="field-errors">
+                                    {% for error in form.group.errors %}
+                                    <span class="error">{{ error }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                            </div>
+                            
+                            <button type="submit" class="register-button">Register User with Special Access</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <h2>Users with Special Access</h2>
+            <div class="table-wrapper">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>Email</th>
+                            <th>Permission Type</th>
+                            <th>Granted By</th>
+                            <th>Granted At</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for special_user in special_users %}
+                        <tr>
+                            <td>{{ special_user.user.username }}</td>
+                            <td>{{ special_user.user.email }}</td>
+                            <td>
+                                <span class="permission-badge permission-{{ special_user.permission_type }}">
+                                    {{ special_user.get_permission_type_display }}
+                                </span>
+                            </td>
+                            <td>{% if special_user.granted_by %}{{ special_user.granted_by.username }}{% else %}System{% endif %}</td>
+                            <td>{{ special_user.granted_at|date:'d/m/Y H:i' }}</td>
+                            <td>
+                                {% if user.is_superuser or user == special_user.granted_by %}
+                                <form method="post" action="{% url 'application:remove_special_access' special_user.id %}" style="display: inline;" onsubmit="return confirm('Are you sure you want to remove special access from {{ special_user.user.username }}?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn-remove">Remove</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="no-data">No users with special access found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const userPanel = document.querySelector('.user-panel');
+        const dropdownMenu = document.querySelector('.dropdown-menu');
+
+        userPanel.addEventListener('click', function(event) {
+            event.stopPropagation();
+            dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.addEventListener('click', function() {
+            dropdownMenu.style.display = 'none';
+        });
+
+        // Password confirmation validation
+        const passwordField = document.getElementById('id_password');
+        const confirmPasswordField = document.getElementById('id_password_confirm');
+        
+        function validatePassword() {
+            if (passwordField.value !== confirmPasswordField.value) {
+                confirmPasswordField.setCustomValidity("Passwords don't match");
+            } else {
+                confirmPasswordField.setCustomValidity('');
+            }
+        }
+
+        passwordField.addEventListener('change', validatePassword);
+        confirmPasswordField.addEventListener('keyup', validatePassword);
+    </script>
+</body>
+</html>

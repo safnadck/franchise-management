@@ -1,4 +1,5 @@
 {% load static %}
+{% load permission_tags %}
 <!DOCTYPE html>
 <html lang="en">
 
@@ -29,30 +30,37 @@
 
   <aside class="sidebar-menu">
     <div class="menu-wrapper">
-      <div class="menu-item">
-        <a href="{% url 'application:franchise_list' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
-          <span class="menu-text">Franchise</span>
-        </a>
-      </div>
-      <div class="menu-item">
-        <a href="{% url 'application:receipt_search' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
-          <span class="menu-text">Receipt</span>
-        </a>
-      </div>
-      <div class="menu-item">
-        <a href="{% url 'application:user_register' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
-          <span class="menu-text">Registration</span>
-        </a>
-      </div>
+
+            <!-- Reports Menu -->
+      {% if user|can_access:"view_reports" or user.is_superuser %}
       <div class="menu-item">
         <a href="{% url 'application:homepage' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
           <span class="menu-text">Reports</span>
         </a>
       </div>
+      {% endif %}
+      
+      <!-- Franchise Menu -->
+      {% if user|can_access:"view_franchise" or user.is_superuser %}
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
+        </a>
+      </div>
+      {% endif %}
+
+      <!-- Receipt Menu -->
+      {% if user|can_access:"process_payment" or user.is_superuser %}
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Receipt</span>
+        </a>
+      </div>
+      {% endif %}
+
     </div>
   </aside>
 
@@ -62,6 +70,9 @@
         <a href="{% url 'application:fee_report' %}" class="backbutton">
           <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
         </a>
+    <button class="sidebar-toggle">
+      <span class="iconify" data-icon="mdi:menu" style="font-size: 20px;"></span>
+        </button>
       </div>
       <div class="right-buttons">
      
@@ -133,7 +144,7 @@
       <div class="stat-box stat-pending">
         <span class="iconify stat-icon" data-icon="mdi:clock-alert"></span>
         <h2>₹{{ total_pending|floatformat:2 }}</h2>
-        <p>Pending Fees</p>
+        <p>Balance Amount</p>
       </div>
 
       <div class="stat-box stat-overdue">
@@ -254,10 +265,14 @@
   {% endif %}
 
   <script>
+
+    
     const selectedBatchId = "{{ selected_batch_id|default:'' }}";
 
     const userPanel = document.querySelector('.user-panel');
     const dropdownMenu = document.querySelector('.dropdown-menu');
+    const sidebar = document.querySelector('.sidebar-menu');
+    const toggleButton = document.querySelector('.sidebar-toggle');
 
     userPanel.addEventListener('click', function(event) {
       event.stopPropagation();
@@ -268,6 +283,17 @@
       dropdownMenu.style.display = 'none';
     });
 
+  // Toggle sidebar on button click
+    toggleButton.addEventListener('click', function() {
+      sidebar.classList.toggle('sidebar-open');
+      const icon = toggleButton.querySelector('.iconify');
+      if (sidebar.classList.contains('sidebar-open')) {
+        icon.setAttribute('data-icon', 'mdi:close');
+      } else {
+        icon.setAttribute('data-icon', 'mdi:menu');
+      }
+    });
+    
     // Dynamic batch loading based on franchise selection
     const franchiseSelect = document.getElementById('franchise-select');
     const batchSelect = document.getElementById('batch-select');

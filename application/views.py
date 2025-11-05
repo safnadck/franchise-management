@@ -1,15 +1,15 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group, Permission
 from django.db import models
 from django.http import JsonResponse, HttpResponseForbidden
-from .forms import FranchiseForm, BatchForm, FranchiseUserRegistrationForm, BatchFeeManagementForm, StudentFeeManagementForm, InstallmentForm, EditInstallmentForm, PaymentForm, StudentEditForm,StudentDiscountForm, SpecialAccessRegistrationForm, SpecialAccessUserRegistrationForm
-from .models import Franchise, UserFranchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, InstallmentTemplate, CourseFee, SpecialAccessUser
+from .forms import FranchiseForm, BatchForm, FranchiseUserRegistrationForm, BatchFeeManagementForm, StudentFeeManagementForm, InstallmentForm, EditInstallmentForm, PaymentForm, StudentEditForm,StudentDiscountForm, SpecialAccessRegistrationForm, SpecialAccessUserRegistrationForm, RoleForm, EditSpecialAccessUserForm
+from .models import Franchise, UserFranchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, InstallmentTemplate, CourseFee, SpecialAccessUser, Payment
 from django.contrib.auth.decorators import login_required, user_passes_test
 from collections import defaultdict
-from django.db.models import Count
+from django.db.models import Count, Case, When, Value, IntegerField
 from django.urls import reverse
 from django.forms import modelformset_factory
-from datetime import timedelta
+from datetime import timedelta, datetime
 from django.utils import timezone
 from django.db import OperationalError, transaction
 from time import sleep
@@ -19,79 +19,309 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Sum
 from django.db.models.functions import TruncMonth
 from django.core.exceptions import PermissionDenied
-
-
+from django.contrib import messages
+import json
 
 from common.djangoapps.student.models import UserProfile
-
 from common.djangoapps.student.models import CourseEnrollment
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
 
+# ==============================
+# PERMISSION & ROLE MANAGEMENT
+# ==============================
+
+def get_permission_type_from_group(group_name):
+    """
+    Map group name to permission type based on keywords
+    """
+    group_name_lower = group_name.lower()
+    if 'franchise' in group_name_lower:
+        return 'franchise_management'
+    elif 'fee' in group_name_lower:
+        return 'fee_management'
+    elif 'student' in group_name_lower:
+        return 'student_management'
+    elif 'report' in group_name_lower:
+        return 'reporting'
+    else:
+        return 'all'  # Default to all if no specific keywords found
+
+def has_permission(user, permission_codename):
+    """
+    Check if user has specific permission through groups or special access
+    """
+    if user.is_superuser:
+        return True
+
+    # Check if user has special access (required for non-superusers to access the system)
+    try:
+        special_access = SpecialAccessUser.objects.get(user=user)
+    except SpecialAccessUser.DoesNotExist:
+        return False
+
+    # Check group permissions (Django's built-in permissions)
+    if user.has_perm(f'application.{permission_codename}'):
+        return True
+
+    return False
+
+def permission_required(permission_codename):
+    """
+    Decorator to check specific permissions
+    """
+    def decorator(view_func):
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect('login')
+            
+            if has_permission(request.user, permission_codename):
+                return view_func(request, *args, **kwargs)
+            
+            return render(request, 'application/access_denied.html', {
+                'message': f"You don't have permission to access this page. Required permission: {permission_codename}"
+            }, status=403)
+        return _wrapped_view
+    return decorator
+
+def role_required(role_name):
+    """
+    Decorator to check if user has specific role (group)
+    """
+    def decorator(view_func):
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect('login')
+            
+            if request.user.is_superuser or request.user.groups.filter(name=role_name).exists():
+                return view_func(request, *args, **kwargs)
+            
+            return render(request, 'application/access_denied.html', {
+                'message': f"Access denied. Required role: {role_name}"
+            }, status=403)
+        return _wrapped_view
+    return decorator
+
+def special_access_required(required_permission=None):
+    """
+    Allows access to superusers or users who have the required special access permission
+    """
+    def decorator(view_func):
+        def _wrapped_view(request, *args, **kwargs):
+            if not request.user.is_authenticated:
+                return redirect('login')
+
+            # Superusers always allowed
+            if request.user.is_superuser:
+                return view_func(request, *args, **kwargs)
+
+            # Check if user has special access
+            try:
+                special_access = SpecialAccessUser.objects.get(user=request.user)
+                # If no permission_type field exists, allow access for backward compatibility
+                if not hasattr(special_access, 'permission_type'):
+                    return view_func(request, *args, **kwargs)
+
+                if required_permission:
+                    if special_access.permission_type in ['all', required_permission]:
+                        return view_func(request, *args, **kwargs)
+                else:
+                    # No specific permission required, just having special access is enough
+                    return view_func(request, *args, **kwargs)
+
+            except SpecialAccessUser.DoesNotExist:
+                pass
+
+            # Otherwise deny access
+            return render(request, 'application/access_denied.html', {
+                'message': f"Special access required: {required_permission or 'any'}"
+            }, status=403)
+        return _wrapped_view
+    return decorator
+
+def get_allowed_franchises(user):
+    """
+    Get the list of franchises the user is allowed to access
+    """
+    if user.is_superuser:
+        return Franchise.objects.all()
+
+    try:
+        special_access = SpecialAccessUser.objects.get(user=user)
+        if special_access.allowed_franchises.exists():
+            return special_access.allowed_franchises.all()
+        else:
+            # If no specific franchises allowed, allow all
+            return Franchise.objects.all()
+    except SpecialAccessUser.DoesNotExist:
+        return Franchise.objects.none()
+
+def get_allowed_batches(user):
+    """
+    Get the list of batches the user is allowed to access
+    """
+    if user.is_superuser:
+        return Batch.objects.all()
+
+    try:
+        special_access = SpecialAccessUser.objects.get(user=user)
+        if special_access.allowed_batches.exists():
+            return special_access.allowed_batches.all()
+        else:
+            # If no specific batches allowed, allow all
+            return Batch.objects.all()
+    except SpecialAccessUser.DoesNotExist:
+        return Batch.objects.none()
 
 def superuser_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('login')  # Redirect to login page for unauthenticated users
+            return redirect('login')
         if not request.user.is_superuser:
-            return render(request, 'application/access_denied.html', status=403)  # Custom access denied page
+            return render(request, 'application/access_denied.html', {
+                'message': "Superuser access required"
+            }, status=403)
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
-def superuser_or_amal_required(view_func):
+def superuser_or_special_required(view_func):
     def _wrapped_view(request, *args, **kwargs):
         if not request.user.is_authenticated:
-            return redirect('login')  # Redirect to login page for unauthenticated users
+            if request.is_ajax():
+                return JsonResponse({'success': False, 'error': 'Authentication required'}, status=401)
+            return redirect('login')
         if not (request.user.is_superuser or SpecialAccessUser.objects.filter(user=request.user).exists()):
-            return render(request, 'application/access_denied.html', status=403)  # Custom access denied page
+            if request.is_ajax():
+                return JsonResponse({'success': False, 'error': 'Superuser or special access required'}, status=403)
+            return render(request, 'application/access_denied.html', {
+                'message': "Superuser or special access required"
+            }, status=403)
         return view_func(request, *args, **kwargs)
     return _wrapped_view
 
 
+VIEW_PERMISSIONS = {
+    'homepage': 'view_dashboard',
+    'fee_report': 'view_reports',
+    'franchise_fees_report': 'view_reports',
+    'monthly_fees_report': 'view_reports',
+    'combined_fees_report': 'view_reports',
+    'course_fee_list': 'change_coursefee',  # Use actual model permission
+    'fee_reminders': 'view_reports',
+    'inactive_users': 'view_reports',
+    'franchise_list': 'view_franchise',
+    'franchise_register': 'add_franchise',
+    'franchise_edit': 'change_franchise',
+    'franchise_report': 'view_franchise',
+    'batch_create': 'add_batch',
+    'batch_students': 'view_userfranchise',  # Use appropriate model
+    'student_detail': 'view_userfranchise',
+    'edit_student_details': 'change_userfranchise',
+    'user_register': 'add_userfranchise',
+    'batch_user_register': 'add_userfranchise',
+    'enroll_existing_user': 'add_userfranchise',
+    'batch_fee_management': 'change_batchfeemanagement',
+    'student_fee_management': 'change_studentfeemanagement',
+    'edit_installment_setup': 'change_installment',
+    'receipt_search': 'process_payment',
+    'receipt_detail': 'process_payment',
+    'special_access_register': 'add_specialaccessuser',
+    'roles': 'auth.change_group',  # Django's group permission
+    'student_counts': 'view_reports',
+    'special_user_dashboard': 'view_dashboard',
+    'student_profile': 'view_profile',
+    'enroll_existing_user_general': 'add_userfranchise',
+}
+# ==============================
+# VIEWS WITH PERMISSION CHECKS
+# ==============================
 
 @login_required
-@superuser_or_amal_required
 def homepage(request):
-    total_franchises = Franchise.objects.count()
-    total_students = UserFranchise.objects.values('user').distinct().count()
-    total_courses = CourseOverview.objects.count()
+    # Check permission using the mapping
+    if not has_permission(request.user, VIEW_PERMISSIONS['homepage']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to access the dashboard"
+        }, status=403)
+
+    # Get only allowed franchises and batches
+    allowed_franchises = get_allowed_franchises(request.user)
+    allowed_batches = get_allowed_batches(request.user)
+
+    # Check for redirection: if user has add_userfranchise permission and exactly one allowed franchise
+    # But don't redirect special access users - they should see the homepage
+    if (not SpecialAccessUser.objects.filter(user=request.user).exists() and
+        has_permission(request.user, 'add_userfranchise') and allowed_franchises.count() == 1):
+        franchise = allowed_franchises.first()
+        return redirect('application:franchise_report', pk=franchise.pk)
+
+    # Count only allowed franchises
+    total_franchises = allowed_franchises.count()
+
+    # Count students only from allowed franchises and batches
+    student_queryset = UserFranchise.objects.filter(franchise__in=allowed_franchises)
+    if allowed_batches.exists():
+        student_queryset = student_queryset.filter(batch__in=allowed_batches)
+    total_students = student_queryset.values('user').distinct().count()
+
+    # For courses, you might want to filter by allowed franchises too
+    # This depends on your business logic
+    total_courses = CourseOverview.objects.count()  # Or filter if needed
 
     return render(request, 'application/homepage.html', {
         'total_franchises': total_franchises,
         'total_students': total_students,
-        'total_courses': total_courses
+        'total_courses': total_courses,
+        'allowed_franchises': allowed_franchises,  # Optional: pass for debugging
     })
 
 @login_required
-@superuser_required
 def fee_report(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['fee_report']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view fee reports"
+        }, status=403)
+
+    # ... rest of your fee_report function code ...
     franchise_id = request.GET.get('franchise_id')
     batch_id = request.GET.get('batch_id')
-    all_franchises = Franchise.objects.all()
+    allowed_franchises = get_allowed_franchises(request.user)
+    allowed_batches = get_allowed_batches(request.user)
+    all_franchises = allowed_franchises
     today = timezone.now().date()
 
-    # Global totals (always full)
-    total_fees = Installment.objects.aggregate(total=Sum('amount'))['total'] or 0
-    total_received = Installment.objects.aggregate(total=Sum('payed_amount'))['total'] or 0
+    # Global totals (always full for allowed franchises and batches)
+    installment_queryset = Installment.objects.filter(
+        student_fee_management__user_franchise__franchise__in=allowed_franchises
+    )
+    if allowed_batches.exists():
+        installment_queryset = installment_queryset.filter(
+            student_fee_management__user_franchise__batch__in=allowed_batches
+        )
+    total_fees = installment_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    total_received = installment_queryset.aggregate(total=Sum('payed_amount'))['total'] or 0
     total_pending = total_fees - total_received
-    overdue_installments = Installment.objects.filter(due_date__lt=today).exclude(status='paid')
+    overdue_installments = installment_queryset.filter(due_date__lt=today).exclude(status='paid')
     total_overdue = sum(inst.amount - inst.payed_amount for inst in overdue_installments) or 0
 
     if batch_id:
         # Filter by batch and its franchise
         try:
             batch = Batch.objects.get(id=batch_id)
-            franchise = batch.franchise
-            franchises = Franchise.objects.filter(id=franchise.id).prefetch_related(
-                'batches__userfranchise_set__fee_management__installments'
-            )
+            if batch not in allowed_batches:
+                franchises = Franchise.objects.none()
+            else:
+                franchise = batch.franchise
+                franchises = allowed_franchises.filter(id=franchise.id).prefetch_related(
+                    'batches__userfranchise_set__fee_management__installments'
+                )
         except Batch.DoesNotExist:
             franchises = Franchise.objects.none()
     elif franchise_id:
-        franchises = Franchise.objects.filter(id=franchise_id).prefetch_related(
+        franchises = allowed_franchises.filter(id=franchise_id).prefetch_related(
             'batches__userfranchise_set__fee_management__installments'
         )
     else:
-        franchises = Franchise.objects.prefetch_related(
+        franchises = allowed_franchises.prefetch_related(
             'batches__userfranchise_set__fee_management__installments'
         ).all()
 
@@ -105,6 +335,9 @@ def fee_report(request):
         batches = franchise.batches.all()
         if batch_id:
             batches = batches.filter(id=batch_id)
+        # Filter batches by allowed_batches if specified
+        if allowed_batches.exists():
+            batches = batches.filter(id__in=allowed_batches)
         for batch in batches:
             batch_received = 0
             batch_pending = 0
@@ -164,24 +397,396 @@ def fee_report(request):
         'monthly_fees': monthly_fees,
     })
 
+# Continue with other views following the same pattern...
+# For brevity, I'll show the pattern for a few more views
 
 @login_required
-@superuser_required
+def franchise_list(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['franchise_list']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view franchises"
+        }, status=403)
+
+    franchises = get_allowed_franchises(request.user)
+    search_query = request.GET.get('search', '').strip()
+
+    if search_query:
+        # Franchises that match the search query
+        matching_franchises = franchises.filter(
+            Q(name__icontains=search_query) |
+            Q(location__icontains=search_query) |
+            Q(coordinator__icontains=search_query) |
+            Q(contact_no__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+        # Franchises that do not match
+        non_matching_franchises = franchises.exclude(
+            Q(name__icontains=search_query) |
+            Q(location__icontains=search_query) |
+            Q(coordinator__icontains=search_query) |
+            Q(contact_no__icontains=search_query) |
+            Q(email__icontains=search_query)
+        )
+        # Combine: matching first, then non-matching
+        franchises = list(matching_franchises) + list(non_matching_franchises)
+    else:
+        franchises = list(franchises)
+
+    return render(request, 'application/franchise_management.html', {
+        'franchises': franchises,
+        'search_query': search_query
+    })
+
+@login_required
+def franchise_register(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['franchise_register']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to add franchises"
+        }, status=403)
+    
+    if request.method == "POST":
+        form = FranchiseForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('application:franchise_list')
+    else:
+        form = FranchiseForm()
+    
+    return render(request, 'application/franchise_register.html', {'form': form})
+
+@login_required
+def user_register(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['user_register']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to register users"
+        }, status=403)
+
+    if request.method == "POST":
+        form = FranchiseUserRegistrationForm(request.POST)
+        if form.is_valid():
+            franchise_id = request.POST.get('franchise')
+            batch_id = request.POST.get('batch')
+            try:
+                franchise = Franchise.objects.get(pk=franchise_id)
+                batch = Batch.objects.get(pk=batch_id)
+                if batch.franchise != franchise:
+                    form.add_error(None, 'Selected batch does not belong to the selected franchise.')
+                else:
+                    # Check if franchise is allowed for special user
+                    allowed_franchises = get_allowed_franchises(request.user)
+                    if franchise not in allowed_franchises:
+                        form.add_error(None, 'You do not have permission to register users for this franchise.')
+                    else:
+                        user = form.save(franchise=franchise, batch=batch, commit=True)
+                        CourseEnrollment.enroll(user, batch.course.id)
+
+                        # 📨 Send welcome + enrollment emails
+                        try:
+                            send_welcome_email(user)
+                            send_enrollment_email(user, batch.course.display_name)
+                            messages.success(request, f"User {user.username} registered and welcome mail sent successfully.")
+                        except Exception as e:
+                            messages.warning(request, f"User registered successfully, but failed to send email: {e}")
+
+                        return redirect('application:homepage')
+            except (Franchise.DoesNotExist, Batch.DoesNotExist, ValueError):
+                form.add_error(None, 'Invalid franchise or batch selected.')
+    else:
+        form = FranchiseUserRegistrationForm()
+
+    franchises = get_allowed_franchises(request.user)
+
+    return render(request, 'application/user_register.html', {
+        'form': form,
+        'franchises': franchises,
+    })
+
+@login_required
+def receipt_search(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['receipt_search']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to process payments"
+        }, status=403)
+    
+    search_query = request.GET.get('search_query', '').strip()
+    user_franchises = []
+
+    if search_query:
+        user_franchises = UserFranchise.objects.select_related('user', 'batch').filter(
+            Q(registration_number__icontains=search_query) |
+            Q(user__email__icontains=search_query) |
+            Q(user__first_name__icontains=search_query) |
+            Q(user__last_name__icontains=search_query) |
+            Q(user__username__icontains=search_query)
+        )
+
+        user_profiles = UserProfile.objects.filter(phone_number__icontains=search_query)
+        user_ids_from_profile = [up.user_id for up in user_profiles]
+        user_franchises = user_franchises | UserFranchise.objects.filter(user_id__in=user_ids_from_profile)
+        user_franchises = user_franchises.distinct()
+
+    return render(request, 'application/receipt_search.html', {
+        'search_query': search_query,
+        'user_franchises': user_franchises,
+    })
+
+# ==============================
+# ROLE MANAGEMENT VIEWS
+# ==============================
+
+@login_required
+@superuser_or_special_required
+def roles(request):
+    if not has_permission(request.user, 'auth.change_group'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage roles"
+        }, status=403)
+        
+    if request.method == 'POST':
+        form = RoleForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Role created successfully!')
+            return redirect('application:roles')
+    else:
+        form = RoleForm()
+
+    # Get all groups and permissions
+    groups = Group.objects.all().prefetch_related('permissions')
+    # Define custom order for models
+    custom_order = [
+        'specialaccessuser',
+        'franchise',
+        'batch',
+        'batchfeemanagement',
+        'userfranchise',
+        'studentfeemanagement',
+        'installment',
+        'installmenttemplate',
+        'coursefee',
+        'payment',
+    ]
+    # Create a case expression for ordering
+    order_case = Case(
+        *[When(content_type__model=model, then=Value(i)) for i, model in enumerate(custom_order)],
+        default=Value(len(custom_order)),
+        output_field=IntegerField()
+    )
+    permissions = Permission.objects.filter(content_type__app_label='application').annotate(
+        custom_order=order_case
+    ).order_by('custom_order', 'content_type__model', 'codename')
+
+    return render(request, 'application/roles.html', {
+        'form': form,
+        'groups': groups,
+        'permissions': permissions,
+    })
+
+@login_required
+@superuser_or_special_required
+def special_access_register(request):
+    if not has_permission(request.user, 'manage_users'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage special access"
+        }, status=403)
+
+    if request.method == 'POST':
+        form = SpecialAccessUserRegistrationForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=True)
+            # Determine permission_type based on selected group
+            selected_group = form.cleaned_data['group']
+            permission_type = get_permission_type_from_group(selected_group.name)
+            # Automatically grant special access to newly registered user
+            special_access = SpecialAccessUser.objects.create(
+                user=user,
+                granted_by=request.user,
+                permission_type=permission_type
+            )
+            # Set allowed franchises and batches
+            allowed_franchises = form.cleaned_data.get('allowed_franchises')
+            allowed_batches = form.cleaned_data.get('allowed_batches')
+            if allowed_franchises:
+                special_access.allowed_franchises.set(allowed_franchises)
+            if allowed_batches:
+                special_access.allowed_batches.set(allowed_batches)
+            messages.success(request, f'User {user.username} registered with special access ({permission_type}).')
+            return redirect('application:special_access_register')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
+    form = SpecialAccessUserRegistrationForm()
+    special_users = SpecialAccessUser.objects.select_related('user', 'granted_by').order_by('-granted_at')
+    # Get batch-franchise map
+    batch_franchise_map = {}
+    for batch in Batch.objects.all().select_related('franchise'):
+        if batch.franchise:
+            batch_franchise_map[str(batch.id)] = str(batch.franchise.id)
+    return render(request, 'application/special_access_register.html', {
+        'form': form,
+        'special_users': special_users,
+        'batch_franchise_map': json.dumps(batch_franchise_map),
+    })
+
+
+@login_required
+@superuser_or_special_required
+def edit_special_access_user(request, user_id):
+    if not has_permission(request.user, 'manage_users'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage special access"
+        }, status=403)
+
+    special_access_user = get_object_or_404(SpecialAccessUser, user_id=user_id)
+
+    if request.method == 'POST':
+        form = EditSpecialAccessUserForm(request.POST, special_access_user=special_access_user)
+        if form.is_valid():
+            # Update allowed franchises and batches
+            allowed_franchises = form.cleaned_data.get('allowed_franchises')
+            allowed_batches = form.cleaned_data.get('allowed_batches')
+            special_access_user.allowed_franchises.set(allowed_franchises)
+            special_access_user.allowed_batches.set(allowed_batches)
+            messages.success(request, f'Access permissions for {special_access_user.user.username} updated successfully.')
+            return redirect('application:special_access_register')
+        else:
+            for field, errors in form.errors.items():
+                for error in errors:
+                    messages.error(request, f"{field}: {error}")
+
+    else:
+        form = EditSpecialAccessUserForm(special_access_user=special_access_user)
+
+    # Get batch-franchise map
+    batch_franchise_map = form.batch_franchise_map
+
+    return render(request, 'application/edit_special_access_user.html', {
+        'form': form,
+        'special_access_user': special_access_user,
+        'batch_franchise_map': json.dumps(batch_franchise_map),
+    })
+
+# ==============================
+# USER PROFILE & DASHBOARD
+# ==============================
+
+@login_required
+def special_user_dashboard(request):
+    if not has_permission(request.user, 'view_dashboard'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to access the dashboard"
+        }, status=403)
+    
+    user = request.user
+    # ... rest of your special_user_dashboard code ...
+
+@login_required
+def student_profile(request):
+    # Users can always access their own profile
+    user = request.user
+
+    # Get user profile for phone number
+    try:
+        user_profile = UserProfile.objects.get(user=user)
+        phone_number = user_profile.phone_number
+    except UserProfile.DoesNotExist:
+        phone_number = None
+
+    # Get all UserFranchise for the user
+    user_franchises = UserFranchise.objects.filter(user=user).select_related('franchise', 'batch', 'batch__course')
+
+    # Collect enrolled courses
+    enrolled_courses = []
+    enrollments = CourseEnrollment.objects.filter(user=user, is_active=True).select_related('course')
+    for enrollment in enrollments:
+        enrolled_courses.append({
+            'course': enrollment.course,
+            'enrollment_date': enrollment.created.date(),
+        })
+
+    # Collect installment data per user_franchise
+    user_franchise_data = []
+    for uf in user_franchises:
+        installments = []
+        try:
+            student_fee = StudentFeeManagement.objects.get(user_franchise=uf)
+            installments = Installment.objects.filter(student_fee_management=student_fee).order_by('due_date')
+        except StudentFeeManagement.DoesNotExist:
+            pass
+
+        user_franchise_data.append({
+            'user_franchise': uf,
+            'installments': installments,
+        })
+
+    context = {
+        'user': user,
+        'phone_number': phone_number,
+        'enrolled_courses': enrolled_courses,
+        'user_franchise_data': user_franchise_data,
+    }
+
+    return render(request, 'application/student_profile.html', context)
+
+# ==============================
+# UTILITY FUNCTIONS
+# ==============================
+
+@login_required
+def get_batches(request, franchise_id):
+    if not has_permission(request.user, 'view_franchise'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+
+    allowed_batches = get_allowed_batches(request.user)
+    batches = Batch.objects.filter(franchise_id=franchise_id, id__in=allowed_batches.values('id')).values('id', 'batch_no')
+    return JsonResponse({'batches': list(batches)})
+
+@login_required
+def get_course_fee(request, course_id):
+    if not has_permission(request.user, 'view_franchise'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    course = get_object_or_404(CourseOverview, id=course_id)
+    fee_obj, created = CourseFee.objects.get_or_create(course=course, defaults={'fee': 0})
+    return JsonResponse({'fee': float(fee_obj.fee)})
+
+
+# ==============================
+# REMAINING VIEWS WITH PERMISSION CHECKS
+# ==============================
+
+@login_required
 def franchise_fees_report(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['franchise_fees_report']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view franchise fee reports"
+        }, status=403)
+
     franchise_id = request.GET.get('franchise_id')
     batch_id = request.GET.get('batch_id')
     if franchise_id == '' or franchise_id == 'None':
         franchise_id = None
     if batch_id == '' or batch_id == 'None':
         batch_id = None
-    all_franchises = Franchise.objects.all()
+    allowed_franchises = get_allowed_franchises(request.user)
+    allowed_batches = get_allowed_batches(request.user)
+    all_franchises = allowed_franchises
     today = timezone.now().date()
 
-    # Global totals (always full)
-    total_fees = Installment.objects.aggregate(total=Sum('amount'))['total'] or 0
-    total_received = Installment.objects.aggregate(total=Sum('payed_amount'))['total'] or 0
+    # Global totals (always full for allowed franchises and batches)
+    installment_queryset = Installment.objects.filter(
+        student_fee_management__user_franchise__franchise__in=allowed_franchises
+    )
+    if allowed_batches.exists():
+        installment_queryset = installment_queryset.filter(
+            student_fee_management__user_franchise__batch__in=allowed_batches
+        )
+    total_fees = installment_queryset.aggregate(total=Sum('amount'))['total'] or 0
+    total_received = installment_queryset.aggregate(total=Sum('payed_amount'))['total'] or 0
     total_pending = total_fees - total_received
-    overdue_installments = Installment.objects.filter(due_date__lt=today).exclude(status='paid')
+    overdue_installments = installment_queryset.filter(due_date__lt=today).exclude(status='paid')
     total_overdue = sum(inst.amount - inst.payed_amount for inst in overdue_installments) or 0
 
     # Filtered totals for stats (when franchise/batch selected)
@@ -195,6 +800,8 @@ def franchise_fees_report(request):
         batch_installments = Installment.objects.filter(
             student_fee_management__user_franchise__batch__id=batch_id
         )
+        if allowed_batches.exists() and int(batch_id) not in allowed_batches.values_list('id', flat=True):
+            batch_installments = Installment.objects.none()
         filtered_total_fees = batch_installments.aggregate(total=Sum('amount'))['total'] or 0
         filtered_total_received = batch_installments.aggregate(total=Sum('payed_amount'))['total'] or 0
         filtered_total_pending = filtered_total_fees - filtered_total_received
@@ -205,6 +812,10 @@ def franchise_fees_report(request):
         franchise_installments = Installment.objects.filter(
             student_fee_management__user_franchise__franchise__id=franchise_id
         )
+        if allowed_batches.exists():
+            franchise_installments = franchise_installments.filter(
+                student_fee_management__user_franchise__batch__in=allowed_batches
+            )
         filtered_total_fees = franchise_installments.aggregate(total=Sum('amount'))['total'] or 0
         filtered_total_received = franchise_installments.aggregate(total=Sum('payed_amount'))['total'] or 0
         filtered_total_pending = filtered_total_fees - filtered_total_received
@@ -215,10 +826,13 @@ def franchise_fees_report(request):
         # Filter by batch and its franchise
         try:
             batch = Batch.objects.get(id=batch_id)
-            franchise = batch.franchise
-            franchises = Franchise.objects.filter(id=franchise.id).prefetch_related(
-                'batches__userfranchise_set__fee_management__installments'
-            )
+            if batch not in allowed_batches:
+                franchises = Franchise.objects.none()
+            else:
+                franchise = batch.franchise
+                franchises = Franchise.objects.filter(id=franchise.id).prefetch_related(
+                    'batches__userfranchise_set__fee_management__installments'
+                )
         except Batch.DoesNotExist:
             franchises = Franchise.objects.none()
     elif franchise_id:
@@ -226,7 +840,7 @@ def franchise_fees_report(request):
             'batches__userfranchise_set__fee_management__installments'
         )
     else:
-        franchises = Franchise.objects.prefetch_related(
+        franchises = allowed_franchises.prefetch_related(
             'batches__userfranchise_set__fee_management__installments'
         ).all()
 
@@ -279,8 +893,6 @@ def franchise_fees_report(request):
     else:
         user_franchises = UserFranchise.objects.all().select_related('user')
 
-    from common.djangoapps.student.models import UserProfile
-
     for uf in user_franchises:
         user_id = uf.user.id
         try:
@@ -323,7 +935,7 @@ def franchise_fees_report(request):
     students = list(students_dict.values())
 
     # Paginate students
-    paginator = Paginator(students, 20)  # 20 students per page
+    paginator = Paginator(students, 20)
     page = request.GET.get('page')
     try:
         students_page = paginator.page(page)
@@ -344,16 +956,18 @@ def franchise_fees_report(request):
         'students_page': students_page,
     })
 
-
-
 @login_required
-@superuser_required
 def monthly_fees_report(request):
-    month = request.GET.get('month')  
-    year = request.GET.get('year')    
+    if not has_permission(request.user, VIEW_PERMISSIONS['monthly_fees_report']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view monthly fee reports"
+        }, status=403)
+
+    month = request.GET.get('month')
+    year = request.GET.get('year')
 
     today = timezone.now().date()
-    all_franchises = Franchise.objects.all()
+    all_franchises = get_allowed_franchises(request.user)
 
     selected_month = None
     if month and year:
@@ -362,9 +976,6 @@ def monthly_fees_report(request):
         except ValueError:
             selected_month = None
 
-    # -------------------------
-    # Prepare month & year choices
-    # -------------------------
     MONTH_CHOICES = [
         (1, 'January'), (2, 'February'), (3, 'March'), (4, 'April'),
         (5, 'May'), (6, 'June'), (7, 'July'), (8, 'August'),
@@ -372,18 +983,14 @@ def monthly_fees_report(request):
     ]
 
     current_year = today.year
-    YEAR_CHOICES = [y for y in range(current_year - 5, current_year + 6)]  # last 10 + next 5 years
+    YEAR_CHOICES = [y for y in range(current_year - 5, current_year + 6)]
 
-    # -------------------------
-    # Calculate totals
-    # -------------------------
     total_fees = Installment.objects.aggregate(total=Sum('amount'))['total'] or 0
     total_received = Installment.objects.aggregate(total=Sum('payed_amount'))['total'] or 0
     total_pending = total_fees - total_received
     overdue_installments = Installment.objects.filter(due_date__lt=today).exclude(status='paid')
     total_overdue = sum(inst.amount - inst.payed_amount for inst in overdue_installments) or 0
 
-    # Filter installments by selected month/year if provided
     if selected_month:
         filtered_installments = Installment.objects.filter(
             due_date__year=selected_month.year,
@@ -401,9 +1008,6 @@ def monthly_fees_report(request):
         filtered_total_pending = total_pending
         filtered_total_overdue = total_overdue
 
-    # -------------------------
-    # Prepare student table
-    # -------------------------
     students_dict = {}
     user_franchises_queryset = UserFranchise.objects.select_related('user')
 
@@ -450,13 +1054,11 @@ def monthly_fees_report(request):
 
     students = []
     for student in students_dict.values():
-        # Only include students with fees if month selected
         if selected_month and (student['total_fees'] > 0 or student['received_fees'] > 0 or student['pending_fees'] > 0 or student['overdue_fees'] > 0):
             students.append(student)
         elif not selected_month:
             students.append(student)
 
-    # Paginate students
     paginator = Paginator(students, 20)
     page = request.GET.get('page')
     try:
@@ -466,9 +1068,6 @@ def monthly_fees_report(request):
     except EmptyPage:
         students_page = paginator.page(paginator.num_pages)
 
-    # -------------------------
-    # Prepare franchise summary (optional)
-    # -------------------------
     franchise_data = []
     franchises = Franchise.objects.prefetch_related(
         'batches__userfranchise_set__fee_management__installments'
@@ -524,11 +1123,13 @@ def monthly_fees_report(request):
         'franchise_data': franchise_data,
     })
 
-
-
 @login_required
-@superuser_required
 def course_fee_list(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['course_fee_list']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage course fees"
+        }, status=403)
+    
     courses = CourseOverview.objects.all()
     course_fees = []
     for course in courses:
@@ -550,10 +1151,16 @@ def course_fee_list(request):
         'course_fees': course_fees,
     })
 
-
 @login_required
-@superuser_required
 def fee_reminders(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['fee_reminders']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view fee reminders"
+        }, status=403)
+
+    allowed_franchises = get_allowed_franchises(request.user)
+    allowed_batches = get_allowed_batches(request.user)
+
     if request.method == 'POST':
         installment_id = request.POST.get('installment_id')
         if installment_id:
@@ -572,6 +1179,11 @@ def fee_reminders(request):
                 pass
         return redirect('application:fee_reminders')
 
+    upcoming_franchise_id = request.GET.get('upcoming_franchise_id')
+    upcoming_batch_id = request.GET.get('upcoming_batch_id')
+    overdue_franchise_id = request.GET.get('overdue_franchise_id')
+    overdue_batch_id = request.GET.get('overdue_batch_id')
+
     today = timezone.now().date()
     three_days_later = today + timedelta(days=3)
 
@@ -579,11 +1191,51 @@ def fee_reminders(request):
         due_date__gte=today,
         due_date__lte=three_days_later,
         status='pending'
-    ).select_related('student_fee_management__user_franchise__user', 'student_fee_management__user_franchise__batch')
+    ).select_related('student_fee_management__user_franchise__user', 'student_fee_management__user_franchise__batch', 'student_fee_management__user_franchise__batch__franchise')
+
+    # Filter by allowed franchises and batches
+    upcoming_installments = upcoming_installments.filter(
+        student_fee_management__user_franchise__franchise__in=allowed_franchises
+    )
+    if allowed_batches.exists():
+        upcoming_installments = upcoming_installments.filter(
+            student_fee_management__user_franchise__batch__in=allowed_batches
+        )
+
+    if upcoming_franchise_id:
+        if upcoming_franchise_id not in [str(f.id) for f in allowed_franchises]:
+            upcoming_installments = Installment.objects.none()
+        else:
+            upcoming_installments = upcoming_installments.filter(student_fee_management__user_franchise__franchise_id=upcoming_franchise_id)
+    if upcoming_batch_id:
+        if upcoming_batch_id not in [str(b.id) for b in allowed_batches]:
+            upcoming_installments = Installment.objects.none()
+        else:
+            upcoming_installments = upcoming_installments.filter(student_fee_management__user_franchise__batch_id=upcoming_batch_id)
 
     overdue_installments = Installment.objects.filter(
         due_date__lt=today
-    ).exclude(status='paid').select_related('student_fee_management__user_franchise__user', 'student_fee_management__user_franchise__batch')
+    ).exclude(status='paid').select_related('student_fee_management__user_franchise__user', 'student_fee_management__user_franchise__batch', 'student_fee_management__user_franchise__batch__franchise')
+
+    # Filter by allowed franchises and batches
+    overdue_installments = overdue_installments.filter(
+        student_fee_management__user_franchise__franchise__in=allowed_franchises
+    )
+    if allowed_batches.exists():
+        overdue_installments = overdue_installments.filter(
+            student_fee_management__user_franchise__batch__in=allowed_batches
+        )
+
+    if overdue_franchise_id:
+        if overdue_franchise_id not in [str(f.id) for f in allowed_franchises]:
+            overdue_installments = Installment.objects.none()
+        else:
+            overdue_installments = overdue_installments.filter(student_fee_management__user_franchise__franchise_id=overdue_franchise_id)
+    if overdue_batch_id:
+        if overdue_batch_id not in [str(b.id) for b in allowed_batches]:
+            overdue_installments = Installment.objects.none()
+        else:
+            overdue_installments = overdue_installments.filter(student_fee_management__user_franchise__batch_id=overdue_batch_id)
 
     overdue_data = []
     for installment in overdue_installments:
@@ -601,37 +1253,53 @@ def fee_reminders(request):
     return render(request, 'application/fee_reminders.html', {
         'upcoming_installments': upcoming_installments,
         'overdue_data': overdue_data,
+        'all_franchises': allowed_franchises,
+        'upcoming_franchise_id': upcoming_franchise_id,
+        'upcoming_batch_id': upcoming_batch_id,
+        'overdue_franchise_id': overdue_franchise_id,
+        'overdue_batch_id': overdue_batch_id,
     })
 
-
 @login_required
-@superuser_required
 def inactive_users(request):
-    # Get filter parameters
+    if not has_permission(request.user, VIEW_PERMISSIONS['inactive_users']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view inactive users"
+        }, status=403)
+
     days_min = request.GET.get('days_min', '').strip()
     franchise_id = request.GET.get('franchise_id', '').strip()
     batch_id = request.GET.get('batch_id', '').strip()
 
-    # Set default days_min to '2' if not provided
     if not days_min:
         days_min = '2'
 
-    # Get users who haven't logged in for the last 2 days
+    allowed_franchises = get_allowed_franchises(request.user)
+    allowed_batches = get_allowed_batches(request.user)
+
     two_days_ago = timezone.now() - timedelta(days=2)
     inactive_users = User.objects.filter(
         models.Q(last_login__isnull=True) | models.Q(last_login__lt=two_days_ago)
     ).filter(userfranchise__isnull=False).distinct().order_by('last_login')
 
-    # Apply franchise filter
+    # Filter by allowed franchises and batches
+    inactive_users = inactive_users.filter(userfranchise__franchise__in=allowed_franchises)
+    if allowed_batches.exists():
+        inactive_users = inactive_users.filter(userfranchise__batch__in=allowed_batches)
+
     if franchise_id:
-        inactive_users = inactive_users.filter(userfranchise__franchise_id=franchise_id)
+        if franchise_id not in [str(f.id) for f in allowed_franchises]:
+            inactive_users = User.objects.none()
+        else:
+            inactive_users = inactive_users.filter(userfranchise__franchise_id=franchise_id)
 
-    # Apply batch filter
     if batch_id:
-        inactive_users = inactive_users.filter(userfranchise__batch_id=batch_id)
+        if batch_id not in [str(b.id) for b in allowed_batches]:
+            inactive_users = User.objects.none()
+        else:
+            inactive_users = inactive_users.filter(userfranchise__batch_id=batch_id)
 
-    # Add pagination
-    paginator = Paginator(inactive_users, 20)  # 20 users per page
+    paginator = Paginator(inactive_users, 20)
     page = request.GET.get('page')
 
     try:
@@ -641,23 +1309,20 @@ def inactive_users(request):
     except EmptyPage:
         users_page = paginator.page(paginator.num_pages)
 
-    # Calculate days since last login for each user
     user_data = []
     now = timezone.now()
     for user in users_page:
         if user.last_login:
             days_inactive = (now - user.last_login).days
         else:
-            days_inactive = None  # Never logged in
+            days_inactive = None
 
-        # Get phone number from UserProfile
         try:
             profile = UserProfile.objects.get(user=user)
             phone_number = profile.phone_number
         except UserProfile.DoesNotExist:
             phone_number = None
 
-        # Get batch and franchise from UserFranchise
         user_franchise = UserFranchise.objects.filter(user=user).first()
         batch = user_franchise.batch if user_franchise else None
         franchise = user_franchise.franchise if user_franchise else None
@@ -670,7 +1335,6 @@ def inactive_users(request):
             'franchise': franchise,
         })
 
-    # Apply days filter
     if days_min:
         try:
             days_min_int = int(days_min)
@@ -678,46 +1342,26 @@ def inactive_users(request):
         except ValueError:
             pass
 
-    # Get options for filters
-    all_franchises = Franchise.objects.all()
-    batches = Batch.objects.filter(franchise_id=franchise_id) if franchise_id else Batch.objects.none()
+    batches = Batch.objects.filter(franchise_id=franchise_id, id__in=allowed_batches.values('id')) if franchise_id else Batch.objects.none()
 
     return render(request, 'application/inactive_users.html', {
         'user_data': user_data,
         'two_days_ago': two_days_ago,
-        'users_page': users_page,  # For pagination info
-        'all_franchises': all_franchises,
+        'users_page': users_page,
+        'all_franchises': allowed_franchises,
         'batches': batches,
         'current_days_min': days_min,
         'current_franchise_id': franchise_id,
         'current_batch_id': batch_id,
     })
 
-
 @login_required
-@superuser_required
-def franchise_list(request):
-    franchises = Franchise.objects.all()
-    return render(request, 'application/franchise_management.html', {'franchises': franchises})
-
-
-@login_required
-@superuser_required
-def franchise_register(request):
-    if request.method == "POST":
-        form = FranchiseForm(request.POST)
-        if form.is_valid():
-            form.save()
-            return redirect('application:franchise_list')
-    else:
-        form = FranchiseForm()
-    
-    return render(request, 'application/franchise_register.html', {'form': form})
-
-
-@login_required
-@superuser_required
 def franchise_edit(request, pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['franchise_edit']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to edit franchises"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=pk)
     
     if request.method == "POST":
@@ -730,11 +1374,21 @@ def franchise_edit(request, pk):
     
     return render(request, 'application/franchise_edit.html', {'form': form, 'franchise': franchise})
 
-
 @login_required
-@superuser_required
 def franchise_report(request, pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['franchise_report']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view franchise reports"
+        }, status=403)
+
     franchise = get_object_or_404(Franchise, pk=pk)
+
+    # Check if user has access to this specific franchise
+    allowed_franchises = get_allowed_franchises(request.user)
+    if franchise not in allowed_franchises:
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to access this franchise"
+        }, status=403)
 
     student_ids = list(
         UserFranchise.objects.filter(franchise=franchise).values_list('user_id', flat=True)
@@ -756,19 +1410,45 @@ def franchise_report(request, pk):
 
     users = list(User.objects.filter(id__in=student_ids).order_by('username'))
 
-    batches = Batch.objects.filter(franchise=franchise).select_related('course')
+    # Get only allowed batches for this franchise
+    allowed_batches = get_allowed_batches(request.user)
+    batches = Batch.objects.filter(franchise=franchise, id__in=allowed_batches.values('id')).select_related('course')
+
+    search_query = request.GET.get('search', '').strip()
+
+    if search_query:
+        # Batches that match the search query
+        matching_batches = batches.filter(
+            Q(batch_no__icontains=search_query) |
+            Q(course__display_name__icontains=search_query) |
+            Q(fees__icontains=search_query)
+        )
+        # Batches that do not match
+        non_matching_batches = batches.exclude(
+            Q(batch_no__icontains=search_query) |
+            Q(course__display_name__icontains=search_query) |
+            Q(fees__icontains=search_query)
+        )
+        # Combine: matching first, then non-matching
+        batches = list(matching_batches) + list(non_matching_batches)
+    else:
+        batches = list(batches)
 
     return render(request, 'application/franchise_report.html', {
         'franchise': franchise,
         'courses': courses,
         'users': users,
         'batches': batches,
+        'search_query': search_query
     })
 
-
 @login_required
-@superuser_required
 def batch_create(request, pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['batch_create']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to create batches"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=pk)
 
     if request.method == "POST":
@@ -776,12 +1456,10 @@ def batch_create(request, pk):
         if form.is_valid():
             batch = form.save(commit=False)
             batch.franchise = franchise
-            # Set fees from course fee
             course_fee, created = CourseFee.objects.get_or_create(course=batch.course, defaults={'fee': 0})
             batch.fees = course_fee.fee
             batch.save()
 
-            # Create BatchFeeManagement automatically with discount from form
             discount = form.cleaned_data.get('discount') or 0
             BatchFeeManagement.objects.create(batch=batch, discount=discount)
 
@@ -794,26 +1472,63 @@ def batch_create(request, pk):
         'franchise': franchise,
     })
 
-
 @login_required
-@superuser_required
 def batch_students(request, franchise_pk, batch_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['batch_students']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view batch students"
+        }, status=403)
+
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
 
     user_franchises = UserFranchise.objects.filter(franchise=franchise, batch=batch).select_related('user')
     users = [uf.user for uf in user_franchises]
 
+    search_query = request.GET.get('search', '').strip()
+
+    if search_query:
+        # Get user profiles for phone numbers
+        user_profiles = UserProfile.objects.filter(user__in=users).select_related('user')
+        profile_dict = {up.user_id: up.phone_number for up in user_profiles}
+
+        # Separate matching and non-matching users
+        matching_users = []
+        non_matching_users = []
+
+        for user in users:
+            phone = profile_dict.get(user.id, '')
+            full_name = user.get_full_name()
+            if (search_query.lower() in full_name.lower() or
+                search_query.lower() in user.username.lower() or
+                search_query.lower() in user.email.lower() or
+                search_query.lower() in phone.lower()):
+                matching_users.append(user)
+            else:
+                non_matching_users.append(user)
+
+        # Combine: matching first, then non-matching
+        users = matching_users + non_matching_users
+    else:
+        users = list(users)
+
+    fees_management_set = BatchFeeManagement.objects.filter(batch=batch).exists() and InstallmentTemplate.objects.filter(batch_fee_management__batch=batch).exists()
+
     return render(request, 'application/batch_students.html', {
         'franchise': franchise,
         'batch': batch,
         'users': users,
+        'fees_management_set': fees_management_set,
+        'search_query': search_query
     })
 
-
 @login_required
-@superuser_required
 def student_detail(request, franchise_pk, batch_pk, user_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['student_detail']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view student details"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
     user = get_object_or_404(User, pk=user_pk)
@@ -857,6 +1572,11 @@ def student_detail(request, franchise_pk, batch_pk, user_pk):
     installments = [{'installment': inst} for inst in existing_installments]
 
     is_enrolled = CourseEnrollment.is_enrolled(user, batch.course.id)
+    show_fee_management_button = has_permission(request.user, VIEW_PERMISSIONS['student_fee_management'])
+    show_edit_button = has_permission(request.user, VIEW_PERMISSIONS['edit_student_details'])
+    show_reports_button = has_permission(request.user, VIEW_PERMISSIONS['homepage'])
+    show_franchise_button = has_permission(request.user, VIEW_PERMISSIONS['franchise_list'])
+    show_receipt_button = has_permission(request.user, VIEW_PERMISSIONS['receipt_search'])
 
     return render(request, 'application/student_detail.html', {
         'franchise': franchise,
@@ -867,12 +1587,20 @@ def student_detail(request, franchise_pk, batch_pk, user_pk):
         'student_fee': student_fee,
         'installments': installments,
         'is_enrolled': is_enrolled,
+        'show_fee_management_button': show_fee_management_button,
+        'show_edit_button': show_edit_button,
+        'show_reports_button': show_reports_button,
+        'show_franchise_button': show_franchise_button,
+        'show_receipt_button': show_receipt_button,
     })
 
-
 @login_required
-@superuser_required
 def edit_student_details(request, franchise_pk, batch_pk, user_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['edit_student_details']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to edit student details"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
     user = get_object_or_404(User, pk=user_pk)
@@ -885,64 +1613,43 @@ def edit_student_details(request, franchise_pk, batch_pk, user_pk):
     else:
         form = StudentEditForm(instance=user)
 
+    show_reports_button = has_permission(request.user, VIEW_PERMISSIONS['homepage'])
+    show_franchise_button = has_permission(request.user, VIEW_PERMISSIONS['franchise_list'])
+    show_receipt_button = has_permission(request.user, VIEW_PERMISSIONS['receipt_search'])    
+
     return render(request, 'application/edit_student_details.html', {
         'form': form,
         'franchise': franchise,
         'batch': batch,
         'user': user,
+        'show_reports_button': show_reports_button,
+        'show_franchise_button': show_franchise_button,
+        'show_receipt_button': show_receipt_button,
     })
 
-@login_required
-@superuser_or_amal_required
-
-def user_register(request):
-    if request.method == "POST":
-        form = FranchiseUserRegistrationForm(request.POST)
-        if form.is_valid():
-            franchise_id = request.POST.get('franchise')
-            batch_id = request.POST.get('batch')
-            try:
-                franchise = Franchise.objects.get(pk=franchise_id)
-                batch = Batch.objects.get(pk=batch_id)
-                if batch.franchise != franchise:
-                    form.add_error(None, 'Selected batch does not belong to the selected franchise.')
-                else:
-                    user = form.save(franchise=franchise, batch=batch, commit=True)
-                    CourseEnrollment.enroll(user, batch.course.id)
-                    return redirect('application:homepage')  # Or to a success page
-            except (Franchise.DoesNotExist, Batch.DoesNotExist, ValueError):
-                form.add_error(None, 'Invalid franchise or batch selected.')
-    else:
-        form = FranchiseUserRegistrationForm()
-
-    franchises = Franchise.objects.all()
-
-    return render(request, 'application/user_register.html', {
-        'form': form,
-        'franchises': franchises,
-    })
-
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from .utils import send_welcome_email, send_enrollment_email  # make sure you have this file as explained earlier
 
 @login_required
-@superuser_or_amal_required
-def get_batches(request, franchise_id):
-    batches = Batch.objects.filter(franchise_id=franchise_id).values('id', 'batch_no')
-    return JsonResponse({'batches': list(batches)})
-
-
-@login_required
-@superuser_required
 def batch_user_register(request, franchise_pk, batch_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['batch_user_register']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to register batch users"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
 
     if request.method == "POST":
         form = FranchiseUserRegistrationForm(request.POST)
         if form.is_valid():
+            # Create and enroll user
             user = form.save(franchise=franchise, batch=batch, commit=True)
             CourseEnrollment.enroll(user, batch.course.id)
 
-            # Create StudentFeeManagement and Installments
+            # Create fee management for the student
             user_franchise = UserFranchise.objects.get(user=user, franchise=franchise, batch=batch)
             fee_management = get_object_or_404(BatchFeeManagement, batch=batch)
             student_fee = StudentFeeManagement.objects.create(
@@ -950,6 +1657,8 @@ def batch_user_register(request, franchise_pk, batch_pk):
                 batch_fee_management=fee_management,
                 discount=fee_management.discount
             )
+
+            # Create installment schedule
             enrollment = CourseEnrollment.objects.get(user=user, course_id=batch.course.id)
             registration_date = enrollment.created.date()
             templates = InstallmentTemplate.objects.filter(batch_fee_management=fee_management).order_by('id')
@@ -964,6 +1673,17 @@ def batch_user_register(request, franchise_pk, batch_pk):
                     repayment_period_days=template.repayment_period_days
                 )
 
+            # 📨 Send welcome + enrollment emails with proper error handling
+            try:
+                send_welcome_email(user)
+                send_enrollment_email(user, batch.course.display_name)
+                messages.success(request, f"User {user.username} registered and welcome mail sent successfully.")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Email sending failed for {user.email}: {str(e)}")
+                messages.warning(request, f"User registered successfully, but failed to send email: {str(e)}")
+
             return redirect('application:batch_students', franchise_pk=franchise.pk, batch_pk=batch.pk)
     else:
         form = FranchiseUserRegistrationForm()
@@ -974,10 +1694,33 @@ def batch_user_register(request, franchise_pk, batch_pk):
         'batch': batch,
     })
 
-
 @login_required
 @superuser_required
+def test_email_config(request):
+    """Test email configuration - for superusers only"""
+    try:
+        from django.core.mail import send_mail
+        send_mail(
+            'Test Email from EzfinTutor',
+            'This is a test email to verify your email configuration.',
+            settings.DEFAULT_FROM_EMAIL,
+            [request.user.email],
+            fail_silently=False
+        )
+        messages.success(request, f"Test email sent successfully to {request.user.email}")
+    except Exception as e:
+        messages.error(request, f"Failed to send test email: {str(e)}")
+    
+    return redirect('application:homepage')
+
+
+@login_required
 def enroll_existing_user(request, franchise_pk, batch_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['enroll_existing_user']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to enroll existing users"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
 
@@ -988,15 +1731,12 @@ def enroll_existing_user(request, franchise_pk, batch_pk):
             already_enrolled = []
             for user_id in user_ids:
                 user = get_object_or_404(User, pk=user_id)
-                # Check if already enrolled in this batch
                 if UserFranchise.objects.filter(user=user, franchise=franchise, batch=batch).exists():
                     already_enrolled.append(user.get_full_name())
                     continue
 
-                # Create UserFranchise
                 user_franchise = UserFranchise.objects.create(user=user, franchise=franchise, batch=batch, registration_number=user.username)
 
-                # Create StudentFeeManagement
                 fee_management = get_object_or_404(BatchFeeManagement, batch=batch)
                 student_fee = StudentFeeManagement.objects.create(
                     user_franchise=user_franchise,
@@ -1004,10 +1744,8 @@ def enroll_existing_user(request, franchise_pk, batch_pk):
                     discount=fee_management.discount
                 )
 
-                # Enroll in course
                 CourseEnrollment.enroll(user, batch.course.id)
 
-                # Create Installments based on templates
                 enrollment = CourseEnrollment.objects.get(user=user, course_id=batch.course.id)
                 registration_date = enrollment.created.date()
                 templates = InstallmentTemplate.objects.filter(batch_fee_management=fee_management).order_by('id')
@@ -1030,11 +1768,9 @@ def enroll_existing_user(request, franchise_pk, batch_pk):
                 messages.warning(request, f"Users {', '.join(already_enrolled)} are already enrolled in this batch.")
             return redirect('application:batch_students', franchise_pk=franchise.pk, batch_pk=batch.pk)
 
-    # Handle search
     search_query = request.GET.get('search_query', '').strip()
     users = []
     if search_query:
-        # To avoid MySQL error with LIMIT & IN subquery, fetch user ids separately
         from common.djangoapps.student.models import UserProfile
         profiles = UserProfile.objects.filter(phone_number__icontains=search_query)
         user_ids_from_profile = [p.user_id for p in profiles]
@@ -1044,11 +1780,10 @@ def enroll_existing_user(request, franchise_pk, batch_pk):
             Q(first_name__icontains=search_query) |
             Q(last_name__icontains=search_query) |
             Q(username__icontains=search_query)
-        ).exclude(userfranchise__batch=batch)
+        ).filter(userfranchise__franchise=franchise).exclude(userfranchise__batch=batch)
 
-        users_by_phone = User.objects.filter(id__in=user_ids_from_profile).exclude(userfranchise__batch=batch)
+        users_by_phone = User.objects.filter(id__in=user_ids_from_profile).filter(userfranchise__franchise=franchise).exclude(userfranchise__batch=batch)
 
-        # Combine querysets and apply distinct and limit
         users = (users_by_fields | users_by_phone).distinct()[:20]
 
     return render(request, 'application/enroll_existing_user.html', {
@@ -1058,10 +1793,13 @@ def enroll_existing_user(request, franchise_pk, batch_pk):
         'users': users,
     })
 
-
 @login_required
-@superuser_required
 def batch_fee_management(request, franchise_pk, batch_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['batch_fee_management']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage batch fees"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
 
@@ -1105,10 +1843,13 @@ def batch_fee_management(request, franchise_pk, batch_pk):
         'installments': installments,
     })
 
-
 @login_required
-@superuser_required
 def student_fee_management(request, franchise_pk, batch_pk, user_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['student_fee_management']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to manage student fees"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
     user = get_object_or_404(User, pk=user_pk)
@@ -1126,7 +1867,6 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
 
     if request.method == "POST":
         existing_installments = Installment.objects.filter(student_fee_management=student_fee).order_by('due_date')
-        # Validate that payments are marked in order and paid installments cannot be changed
         error_message = None
         last_paid_index = -1
         for i, installment in enumerate(existing_installments):
@@ -1148,17 +1888,14 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
                     error_message = "Payed amount must be greater than or equal to 0."
                     break
 
-                # New validation: if status is paid, payed amount must be > 0
                 if new_status == 'paid' and new_payed_amount <= 0:
                     error_message = "Payed amount must be greater than zero to mark as paid."
                     break
 
-                # If installment is already paid, status cannot be changed
                 if installment.status == 'paid' and new_status != 'paid':
                     error_message = "Paid installments cannot be changed."
                     break
 
-                # Enforce order: can only mark this installment as paid if all previous are paid
                 if new_status == 'paid':
                     if i > 0 and existing_installments[i-1].status != 'paid':
                         error_message = "Payments must be marked in order."
@@ -1166,10 +1903,8 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
                     last_paid_index = i
 
         if error_message:
-            from django.contrib import messages
             messages.error(request, error_message)
         else:
-            # Save changes if no errors
             for i, installment in enumerate(existing_installments):
                 status_key = f'status_{installment.id}'
                 payed_amount_key = f'payed_amount_{installment.id}'
@@ -1181,7 +1916,7 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
                         new_payed_amount = 0
 
                     if new_status in ['pending', 'paid', 'overdue']:
-                        if installment.status != 'paid':  # Only update if not already paid
+                        if installment.status != 'paid':
                             installment.status = new_status
                             installment.payed_amount = new_payed_amount
                             if new_status == 'paid' and not installment.payment_date:
@@ -1201,6 +1936,9 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
 
     total_paid = sum(installment.payed_amount for installment in existing_installments)
     total_pending = sum(installment.amount - installment.payed_amount for installment in existing_installments)
+    show_reports_button = has_permission(request.user, VIEW_PERMISSIONS['homepage'])
+    show_franchise_button = has_permission(request.user, VIEW_PERMISSIONS['franchise_list'])
+    show_receipt_button = has_permission(request.user, VIEW_PERMISSIONS['receipt_search'])
 
     return render(request, 'application/student_fee_management.html', {
         'franchise': franchise,
@@ -1212,17 +1950,18 @@ def student_fee_management(request, franchise_pk, batch_pk, user_pk):
         'total_paid': total_paid,
         'total_pending': total_pending,
         'registration_date': registration_date,
+        'show_reports_button': show_reports_button,
+        'show_franchise_button': show_franchise_button,
+        'show_receipt_button': show_receipt_button,
     })
 
-
-
-
-from django.contrib import messages
-from django.forms import modelformset_factory
-
 @login_required
-@superuser_required
 def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
+    if not has_permission(request.user, VIEW_PERMISSIONS['edit_installment_setup']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to edit installment setup"
+        }, status=403)
+    
     franchise = get_object_or_404(Franchise, pk=franchise_pk)
     batch = get_object_or_404(Batch, pk=batch_pk, franchise=franchise)
     user = get_object_or_404(User, pk=user_pk)
@@ -1231,27 +1970,28 @@ def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
     user_franchise = get_object_or_404(UserFranchise, user=user, franchise=franchise, batch=batch)
     student_fee = get_object_or_404(StudentFeeManagement, user_franchise=user_franchise)
 
-    # Get registration date
     enrollment = CourseEnrollment.objects.get(user=user, course_id=batch.course.id)
     registration_date = enrollment.created.date()
 
-    # Define the formset - only include editable fields
     EditInstallmentFormSet = modelformset_factory(
         Installment,
         form=EditInstallmentForm,
         extra=0,
         can_delete=True,
-        fields=['amount', 'repayment_period_days']  
+        fields=['amount', 'repayment_period_days']
     )
 
-    discount_form = StudentDiscountForm(instance=student_fee)
+    discount_form = StudentDiscountForm()
 
     if request.method == "POST":
         action = request.POST.get('action')
         if action == 'save_discount':
-            discount_form = StudentDiscountForm(request.POST, instance=student_fee)
+            discount_form = StudentDiscountForm(request.POST)
             if discount_form.is_valid():
-                discount_form.save()
+                additional_discount = discount_form.cleaned_data.get('additional_discount') or 0
+                total_discount = fee_management.discount + additional_discount
+                student_fee.discount = total_discount
+                student_fee.save()
                 messages.success(request, 'Discount updated successfully!')
                 return redirect('application:edit_installment_setup', franchise_pk=franchise.pk, batch_pk=batch.pk, user_pk=user.pk)
         else:
@@ -1265,20 +2005,16 @@ def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
                     with transaction.atomic():
                         instances = formset.save(commit=False)
 
-                        # Process deleted instances
                         for obj in formset.deleted_objects:
                             obj.delete()
 
-                        # First pass: Save all instances with temporary due_date
                         for instance in instances:
-                            if not instance.pk:  # New instance
+                            if not instance.pk:
                                 instance.student_fee_management = student_fee
                                 instance.status = 'pending'
-                                # Set a temporary due_date to avoid null constraint
                                 instance.due_date = timezone.now().date()
                             instance.save()
 
-                        # Now recalculate due dates for all installments properly
                         all_installments = Installment.objects.filter(
                             student_fee_management=student_fee
                         ).order_by('id')
@@ -1289,17 +2025,7 @@ def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
                             installment.due_date = registration_date + timedelta(days=cumulative_days)
                             installment.save()
 
-                        # Calculate total installment amount
-                        total_installments = sum(
-                            inst.amount for inst in Installment.objects.filter(
-                                student_fee_management=student_fee
-                            )
-                        )
-
-                        # Calculate amount to be added to match remaining amount
-                        amount_to_add = student_fee.remaining_amount - total_installments
-
-                        messages.success(request, f'Installments updated successfully! Amount to add: ₹{amount_to_add:.2f}')
+                        messages.success(request, 'Installments updated successfully!')
                         return redirect('application:student_fee_management',
                                       franchise_pk=franchise.pk,
                                       batch_pk=batch.pk,
@@ -1315,11 +2041,13 @@ def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
             queryset=Installment.objects.filter(student_fee_management=student_fee)
         )
 
-    # Calculate current totals for display
     current_installments = Installment.objects.filter(student_fee_management=student_fee)
     total_installment_amount = sum(inst.amount for inst in current_installments)
     amount_to_add = student_fee.remaining_amount - total_installment_amount
-    amount_to_add_absolute = abs(amount_to_add)  # Calculate absolute value for template
+    amount_to_add_absolute = abs(amount_to_add)
+    show_reports_button = has_permission(request.user, VIEW_PERMISSIONS['homepage'])
+    show_franchise_button = has_permission(request.user, VIEW_PERMISSIONS['franchise_list'])
+    show_receipt_button = has_permission(request.user, VIEW_PERMISSIONS['receipt_search'])
 
     return render(request, 'application/edit_installment_setup.html', {
         'franchise': franchise,
@@ -1332,13 +2060,22 @@ def edit_installment_setup(request, franchise_pk, batch_pk, user_pk):
         'enrollment': enrollment,
         'total_installment_amount': total_installment_amount,
         'amount_to_add': amount_to_add,
-        'amount_to_add_absolute': amount_to_add_absolute,  
+        'amount_to_add_absolute': amount_to_add_absolute,
+        'batch_discount': fee_management.discount,
+        'additional_discount': student_fee.discount - fee_management.discount if student_fee.discount > fee_management.discount else 0,
+        'total_discount': student_fee.discount,
+        'show_reports_button': show_reports_button,
+        'show_franchise_button': show_franchise_button,
+        'show_receipt_button': show_receipt_button,
     })
 
-
 @login_required
-@superuser_required
 def print_installment_invoice(request, franchise_pk, batch_pk, user_pk, installment_pk):
+    if not has_permission(request.user, 'process_payment'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to print invoices"
+        }, status=403)
+    
     installment = get_object_or_404(
         Installment.objects.select_related(
             'student_fee_management__user_franchise__user',
@@ -1355,7 +2092,6 @@ def print_installment_invoice(request, franchise_pk, batch_pk, user_pk, installm
     franchise = batch.franchise
     fee_management = student_fee.batch_fee_management
 
-    # Calculate totals
     all_installments = Installment.objects.filter(student_fee_management=student_fee)
     total_paid = sum(inst.payed_amount for inst in all_installments)
     installment_balance = installment.amount - installment.payed_amount
@@ -1370,58 +2106,24 @@ def print_installment_invoice(request, franchise_pk, batch_pk, user_pk, installm
         'installment_balance': installment_balance,
     })
 
-
 @login_required
-@superuser_required
-def receipt_search(request):
-    search_query = request.GET.get('search_query', '').strip()
-    user_franchises = []
-
-    if search_query:
-        user_franchises = UserFranchise.objects.select_related('user', 'batch').filter(
-            Q(registration_number__icontains=search_query) |
-            Q(user__email__icontains=search_query) |
-            Q(user__first_name__icontains=search_query) |
-            Q(user__last_name__icontains=search_query) |
-            Q(user__username__icontains=search_query)
-        )
-
-        from common.djangoapps.student.models import UserProfile
-        user_profiles = UserProfile.objects.filter(phone_number__icontains=search_query)
-        user_ids_from_profile = [up.user_id for up in user_profiles]
-        user_franchises = user_franchises | UserFranchise.objects.filter(user_id__in=user_ids_from_profile)
-        user_franchises = user_franchises.distinct()
-
-    return render(request, 'application/receipt_search.html', {
-        'search_query': search_query,
-        'user_franchises': user_franchises,
-    })
-
-@login_required
-@superuser_required
-def get_course_fee(request, course_id):
-    from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-    course = get_object_or_404(CourseOverview, id=course_id)
-    fee_obj, created = CourseFee.objects.get_or_create(course=course, defaults={'fee': 0})
-    return JsonResponse({'fee': float(fee_obj.fee)})
-
-@login_required
-@superuser_required
 def receipt_detail(request, franchise_id):
+    if not has_permission(request.user, VIEW_PERMISSIONS['receipt_detail']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to access receipt details"
+        }, status=403)
+    
     user_franchise = get_object_or_404(UserFranchise, id=franchise_id)
     user = user_franchise.user
     
-    from common.djangoapps.student.models import UserProfile
     try:
         user_profile = UserProfile.objects.get(user=user)
     except UserProfile.DoesNotExist:
         user_profile = None
 
-    # Get all UserFranchise for the user
     all_user_franchises = UserFranchise.objects.filter(user=user).select_related('batch', 'franchise')
 
     if request.method == 'POST':
-        # Handle enrollment actions first
         action = request.POST.get('action')
         uf_id = request.POST.get('user_franchise_id')
         if uf_id and action in ['enroll', 'unenroll']:
@@ -1436,7 +2138,6 @@ def receipt_detail(request, franchise_id):
                     CourseEnrollment.unenroll(user, course_id)
             return redirect('application:receipt_detail', franchise_id=franchise_id)
 
-        # Handle payment processing
         payment_amount_str = request.POST.get('payment_amount', '').strip()
         uf_id = request.POST.get('user_franchise_id')
         
@@ -1465,7 +2166,6 @@ def receipt_detail(request, franchise_id):
             status__in=['pending', 'overdue']
         ).order_by('due_date')
 
-        # Process payment
         remaining_payment = payment_amount
         affected_installments = []
         
@@ -1486,22 +2186,19 @@ def receipt_detail(request, franchise_id):
                 installment.save()
                 affected_installments.append(installment.id)
 
-        # Update student fee management
         total_paid = sum(inst.payed_amount for inst in Installment.objects.filter(student_fee_management=student_fee))
         student_fee.remaining_amount = student_fee.batch_fee_management.remaining_amount - total_paid
         student_fee.save()
 
-        # Set session data for print functionality
         request.session['payment_just_made'] = True
         request.session['last_payment_amount'] = float(payment_amount)
         request.session['affected_installments'] = affected_installments
         request.session['payment_date'] = timezone.now().date().isoformat()
-        request.session['payment_user_franchise_id'] = uf_id  # Track which franchise was paid
+        request.session['payment_user_franchise_id'] = uf_id
 
         messages.success(request, f"Payment of ₹{payment_amount} applied successfully.")
         return redirect('application:receipt_detail', franchise_id=franchise_id)
 
-    # Prepare data for each user_franchise (AFTER processing POST)
     user_franchise_data = []
     for uf in all_user_franchises:
         installments = []
@@ -1510,7 +2207,6 @@ def receipt_detail(request, franchise_id):
             student_fee = StudentFeeManagement.objects.get(user_franchise=uf)
             installments = Installment.objects.filter(student_fee_management=student_fee).order_by('due_date')
 
-            # Calculate remaining amount for each installment
             for installment in installments:
                 if installment.status == 'paid':
                     installment.remaining_amount = 0
@@ -1520,7 +2216,6 @@ def receipt_detail(request, franchise_id):
         except StudentFeeManagement.DoesNotExist:
             pass
 
-        # Check enrollment status
         batch = uf.batch
         course_id = batch.course.id if batch and batch.course else None
         if course_id:
@@ -1532,13 +2227,12 @@ def receipt_detail(request, franchise_id):
             'is_enrolled': is_enrolled,
         })
 
-    # Check if payment was just made (for enabling print button)
     payment_just_made = request.session.get('payment_just_made', False)
     last_payment_amount = request.session.get('last_payment_amount', 0)
     payment_user_franchise_id = request.session.get('payment_user_franchise_id')
-
-    # Clear session data after rendering (but keep for print functionality)
-    # We'll clear it when user navigates away or after print
+    show_reports_button = has_permission(request.user, VIEW_PERMISSIONS['homepage'])
+    show_franchise_button = has_permission(request.user, VIEW_PERMISSIONS['franchise_list'])
+    show_receipt_button = has_permission(request.user, VIEW_PERMISSIONS['receipt_search']) 
 
     return render(request, 'application/receipt_detail.html', {
         'user': user,
@@ -1548,14 +2242,19 @@ def receipt_detail(request, franchise_id):
         'last_payment_amount': last_payment_amount,
         'payment_user_franchise_id': payment_user_franchise_id,
         'franchise_id': franchise_id, 
-         "registration_number": uf.registration_number, # Add this for context
-        
+        "registration_number": user_franchise.registration_number,
+        'show_reports_button': show_reports_button,
+        'show_franchise_button': show_franchise_button,
+        'show_receipt_button': show_receipt_button,
     })
 
 @login_required
-@superuser_required
 def clear_payment_session(request, franchise_id):
-    """Clear payment session data"""
+    if not has_permission(request.user, 'process_payment'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to clear payment sessions"
+        }, status=403)
+    
     if 'payment_just_made' in request.session:
         del request.session['payment_just_made']
     if 'last_payment_amount' in request.session:
@@ -1569,10 +2268,11 @@ def clear_payment_session(request, franchise_id):
     
     return redirect('application:receipt_detail', franchise_id=franchise_id)
 
-
 @login_required
-@superuser_required
 def receipt_search_api(request):
+    if not has_permission(request.user, 'process_payment'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
     query = request.GET.get('q', '').strip()
     results = []
 
@@ -1585,13 +2285,11 @@ def receipt_search_api(request):
             Q(user__username__icontains=query)
         )
 
-        # also search by phone number
         user_profiles = UserProfile.objects.filter(phone_number__icontains=query)
         user_ids_from_profile = [up.user_id for up in user_profiles]
         user_franchises = user_franchises | UserFranchise.objects.filter(user_id__in=user_ids_from_profile)
         user_franchises = user_franchises.distinct()[:15]
 
-        # ✅ preload all phone numbers into a dictionary
         profiles = {
             p.user_id: p.phone_number
             for p in UserProfile.objects.filter(user__in=[uf.user for uf in user_franchises])
@@ -1603,20 +2301,21 @@ def receipt_search_api(request):
                 "registration_number": uf.registration_number,
                 "name": uf.user.get_full_name(),
                 "email": uf.user.email,
-                "phone": profiles.get(uf.user_id, "N/A"),  # fallback to "N/A"
+                "phone": profiles.get(uf.user_id, "N/A"),
                 "batch": uf.batch.batch_no if uf.batch else "",
                 "detail_url": reverse("application:receipt_detail", args=[uf.id]),
             })
 
     return JsonResponse({"results": results})
 
-
 @login_required
-@superuser_required
 def print_receipt_detail(request, franchise_id):
+    if not has_permission(request.user, 'process_payment'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to print receipts"
+        }, status=403)
+    
     user_franchise = get_object_or_404(UserFranchise, id=franchise_id)
-    from common.djangoapps.student.models import UserProfile
-
     try:
         user_profile = UserProfile.objects.get(user=user_franchise.user)
     except UserProfile.DoesNotExist:
@@ -1632,7 +2331,6 @@ def print_receipt_detail(request, franchise_id):
         student_fee = StudentFeeManagement.objects.get(user_franchise=user_franchise)
         installments = Installment.objects.filter(student_fee_management=student_fee).order_by('due_date')
 
-        # Calculate totals
         for installment in installments:
             total_amount += installment.amount
             if installment.status == 'paid':
@@ -1655,54 +2353,46 @@ def print_receipt_detail(request, franchise_id):
         'last_payment_date': last_payment_date,
     })
 
-
 @login_required
-@superuser_required
 def print_payment_detail(request, franchise_id):
-    """Print only the payment details for recent payments"""
-    # Use the correct user_franchise from session if payment was made to a specific course
+    if not has_permission(request.user, 'process_payment'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to print payment details"
+        }, status=403)
+    
     payment_franchise_id = request.session.get('payment_user_franchise_id')
     if payment_franchise_id:
         user_franchise = get_object_or_404(UserFranchise, id=payment_franchise_id)
     else:
         user_franchise = get_object_or_404(UserFranchise, id=franchise_id)
-    from common.djangoapps.student.models import UserProfile
-
+        
     try:
         user_profile = UserProfile.objects.get(user=user_franchise.user)
     except UserProfile.DoesNotExist:
         user_profile = None
 
-    # Get recent payment information from session
     last_payment_amount = request.session.get('last_payment_amount', 0)
     affected_installment_ids = request.session.get('affected_installments', [])
     payment_date_str = request.session.get('payment_date')
 
-    # Convert payment_date back to date object
     payment_date = timezone.now().date()
     if payment_date_str:
         try:
-            from datetime import datetime
             payment_date = datetime.fromisoformat(payment_date_str).date()
         except:
             pass
 
-    # Get student fee information
     try:
         student_fee = StudentFeeManagement.objects.get(user_franchise=user_franchise)
         installments = Installment.objects.filter(student_fee_management=student_fee).order_by('due_date')
-
-        # Get the specific installments that were affected by the recent payment
         recent_payments = Installment.objects.filter(
             id__in=affected_installment_ids,
             student_fee_management=student_fee
         ).order_by('due_date')
-
     except StudentFeeManagement.DoesNotExist:
         installments = []
         recent_payments = []
 
-    # Clear session data after printing to prevent reuse
     request.session.pop('payment_just_made', None)
     request.session.pop('last_payment_amount', None)
     request.session.pop('affected_installments', None)
@@ -1717,18 +2407,17 @@ def print_payment_detail(request, franchise_id):
         'recent_payments': recent_payments,
     })
 
-from datetime import datetime  
-
 @login_required
-@superuser_required
 def combined_fees_report(request):
-    # -------------------------
-    # Get filter parameters
-    # -------------------------
+    if not has_permission(request.user, VIEW_PERMISSIONS['combined_fees_report']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view combined fee reports"
+        }, status=403)
+
     franchise_id = request.GET.get('franchise_id')
     batch_id = request.GET.get('batch_id')
-    month = request.GET.get('month')   # 1-12
-    year = request.GET.get('year')     # e.g., 2025
+    month = request.GET.get('month')
+    year = request.GET.get('year')
 
     if franchise_id in ('', 'None'):
         franchise_id = None
@@ -1736,9 +2425,8 @@ def combined_fees_report(request):
         batch_id = None
 
     today = timezone.now().date()
-    all_franchises = Franchise.objects.all()
+    all_franchises = get_allowed_franchises(request.user)
 
-    # Convert month/year to a date object for filtering
     selected_month = None
     if month and year:
         try:
@@ -1753,7 +2441,7 @@ def combined_fees_report(request):
     ]
 
     current_year = today.year
-    YEAR_CHOICES = [y for y in range(current_year - 5, current_year + 6)]  
+    YEAR_CHOICES = [y for y in range(current_year - 5, current_year + 6)]
 
     installments_queryset = Installment.objects.all()
 
@@ -1773,18 +2461,12 @@ def combined_fees_report(request):
             due_date__month=selected_month.month
         )
 
-    # -------------------------
-    # Calculate totals
-    # -------------------------
     filtered_total_fees = installments_queryset.aggregate(total=Sum('amount'))['total'] or 0
     filtered_total_received = installments_queryset.aggregate(total=Sum('payed_amount'))['total'] or 0
     filtered_total_pending = filtered_total_fees - filtered_total_received
     overdue_installments = installments_queryset.filter(due_date__lt=today).exclude(status='paid')
     filtered_total_overdue = sum(inst.amount - inst.payed_amount for inst in overdue_installments) or 0
 
-    # -------------------------
-    # Franchise breakdown
-    # -------------------------
     franchises_queryset = Franchise.objects.prefetch_related(
         'batches__userfranchise_set__fee_management__installments'
     )
@@ -1835,9 +2517,6 @@ def combined_fees_report(request):
             'overdue': franchise_overdue,
         })
 
-    # -------------------------
-    # Prepare student table
-    # -------------------------
     students_dict = {}
     user_franchises_queryset = UserFranchise.objects.select_related('user')
 
@@ -1888,8 +2567,6 @@ def combined_fees_report(request):
         students_dict[user_id]['overdue_fees'] += overdue
 
     students = list(students_dict.values())
-
-    # Filter out students with zero total fees
     students = [s for s in students if s['total_fees'] > 0]
 
     paginator = Paginator(students, 20)
@@ -1917,46 +2594,27 @@ def combined_fees_report(request):
         'students_page': students_page,
     })
 
+@login_required
+def get_batches_for_franchises(request):
+    if not has_permission(request.user, 'view_franchise'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    franchise_ids = request.GET.getlist('franchise_ids[]')
+    try:
+        franchise_ids = [int(id) for id in franchise_ids]
+    except ValueError:
+        return JsonResponse({'error': 'Invalid franchise IDs'}, status=400)
+    batches = Batch.objects.filter(franchise_id__in=franchise_ids).values('id', 'batch_no', 'franchise__name')
+    return JsonResponse({'batches': list(batches)})
 
 @login_required
-@superuser_required
-def special_access_register(request):
-    if request.method == 'POST':
-        if 'grant_access' in request.POST:
-            form = SpecialAccessRegistrationForm(request.POST)
-            if form.is_valid():
-                user = form.cleaned_data['user']
-                if not SpecialAccessUser.objects.filter(user=user).exists():
-                    SpecialAccessUser.objects.create(user=user, granted_by=request.user)
-                    messages.success(request, f'Special access granted to {user.username}.')
-                else:
-                    messages.warning(request, f'{user.username} already has special access.')
-                return redirect('application:special_access_register')
-        elif 'register_user' in request.POST:
-            # Handle user registration
-            form_data = SpecialAccessUserRegistrationForm(request.POST)
-            if form_data.is_valid():
-                user = form_data.save(commit=True)
-                # Automatically grant special access to newly registered user
-                SpecialAccessUser.objects.create(user=user, granted_by=request.user)
-                messages.success(request, f'User {user.username} registered and granted special access.')
-                return redirect('application:special_access_register')
-            else:
-                messages.error(request, 'Error registering user. Please check the form.')
-                return redirect('application:special_access_register')
-
-    form = SpecialAccessRegistrationForm()
-    special_users = SpecialAccessUser.objects.select_related('user', 'granted_by').order_by('-granted_at')
-    return render(request, 'application/special_access_register.html', {
-        'form': form,
-        'special_users': special_users,
-    })
-
-
-@login_required
-@superuser_required
 def student_counts(request):
-    franchises = Franchise.objects.prefetch_related('batches__userfranchise_set').all()
+    if not has_permission(request.user, VIEW_PERMISSIONS['student_counts']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to view student counts"
+        }, status=403)
+
+    franchises = get_allowed_franchises(request.user).prefetch_related('batches__userfranchise_set')
     franchise_data = []
 
     for franchise in franchises:
@@ -1982,10 +2640,97 @@ def student_counts(request):
         'franchise_data': franchise_data,
     })
 
+@login_required
+def special_user_dashboard(request):
+    if not has_permission(request.user, VIEW_PERMISSIONS['special_user_dashboard']):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to access the special user dashboard"
+        }, status=403)
+
+    user = request.user
+
+    # For special access users, use allowed franchises/batches from SpecialAccessUser
+    try:
+        special_access = SpecialAccessUser.objects.get(user=user)
+        assigned_franchises = special_access.allowed_franchises.all()
+        assigned_batches = special_access.allowed_batches.all()
+    except SpecialAccessUser.DoesNotExist:
+        # Fallback to UserFranchise if not special access
+        user_franchises = UserFranchise.objects.filter(user=user).select_related('franchise', 'batch')
+        assigned_franchises = set(uf.franchise for uf in user_franchises if uf.franchise)
+        assigned_batches = set(uf.batch for uf in user_franchises if uf.batch)
+
+    if assigned_franchises:
+        franchises = assigned_franchises
+        batches = Batch.objects.filter(franchise__in=assigned_franchises)
+        user_franchises_all = UserFranchise.objects.filter(franchise__in=assigned_franchises).select_related('user', 'batch')
+    else:
+        franchises = Franchise.objects.none()
+        batches = Batch.objects.none()
+        user_franchises_all = UserFranchise.objects.none()
+
+    total_franchises = franchises.count()
+    total_batches = batches.count()
+    total_students = user_franchises_all.values('user').distinct().count()
+
+    total_fees = 0
+    total_received = 0
+    total_pending = 0
+    total_overdue = 0
+
+    today = timezone.now().date()
+    for franchise in franchises:
+        franchise_installments = Installment.objects.filter(
+            student_fee_management__user_franchise__franchise=franchise
+        )
+        total_fees += franchise_installments.aggregate(Sum('amount'))['amount__sum'] or 0
+        total_received += franchise_installments.aggregate(Sum('payed_amount'))['payed_amount__sum'] or 0
+        total_pending += sum(inst.amount - inst.payed_amount for inst in franchise_installments)
+        overdue_installments = franchise_installments.filter(due_date__lt=today).exclude(status='paid')
+        total_overdue += sum(inst.amount - inst.payed_amount for inst in overdue_installments)
+
+    recent_payments = Payment.objects.filter(
+        installment__student_fee_management__user_franchise__franchise__in=assigned_franchises
+    ).select_related(
+        'installment__student_fee_management__user_franchise__user',
+        'installment__student_fee_management__user_franchise__batch'
+    ).order_by('-payment_date')[:10]
+
+    upcoming_dues = Installment.objects.filter(
+        student_fee_management__user_franchise__franchise__in=assigned_franchises,
+        due_date__gte=today,
+        due_date__lte=today + timedelta(days=7),
+        status__in=['pending', 'overdue']
+    ).select_related(
+        'student_fee_management__user_franchise__user',
+        'student_fee_management__user_franchise__batch'
+    ).order_by('due_date')[:10]
+
+    context = {
+        'total_franchises': total_franchises,
+        'total_batches': total_batches,
+        'total_students': total_students,
+        'total_fees': total_fees,
+        'total_received': total_received,
+        'total_pending': total_pending,
+        'total_overdue': total_overdue,
+        'franchises': franchises,
+        'batches': batches,
+        'recent_payments': recent_payments,
+        'upcoming_dues': upcoming_dues,
+        'assigned_franchises': assigned_franchises,
+        'assigned_batches': assigned_batches,
+    }
+
+    return render(request, 'application/special_user_dashboard.html', context)
 
 @login_required
-@superuser_or_amal_required
 def enroll_existing_user_general(request):
+    if not has_permission(request.user, 'add_student'):
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to enroll users"
+        }, status=403)
+
     franchises = Franchise.objects.all()
     user_search_results = []
     search_query = request.GET.get('search_query', '')
@@ -2073,7 +2818,6 @@ def enroll_existing_user_general(request):
             except Exception as e:
                 messages.error(request, f'Error enrolling users: {str(e)}')
 
-        # Re-render with current search if error
         return render(request, 'application/enroll_existing_user_general.html', {
             'franchises': franchises,
             'user_search_results': user_search_results,
@@ -2085,3 +2829,88 @@ def enroll_existing_user_general(request):
         'user_search_results': user_search_results,
         'search_query': search_query,
     })
+
+@login_required
+@superuser_or_special_required
+def edit_role(request, group_id):
+    if not has_permission(request.user, 'auth.change_group'):
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': False, 'error': 'Permission denied'}, status=403)
+        return render(request, 'application/access_denied.html', {
+            'message': "You don't have permission to edit roles"
+        }, status=403)
+
+    group = get_object_or_404(Group, id=group_id)
+
+    if request.method == 'POST':
+        form = RoleForm(request.POST, instance=group)
+        if form.is_valid():
+            form.save()
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': True})
+            messages.success(request, 'Role updated successfully!')
+            return redirect('application:roles')
+        else:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+            messages.error(request, 'Please correct the errors below.')
+    else:
+        form = RoleForm(instance=group)
+
+    # Define custom permission order
+    custom_order = [
+        'specialaccessuser',
+        'franchise',
+        'batch',
+        'batchfeemanagement',
+        'userfranchise',
+        'studentfeemanagement',
+        'installment',
+        'installmenttemplate',
+        'coursefee',
+        'payment',
+    ]
+
+    # Order permissions by custom order
+    order_case = Case(
+        *[When(content_type__model=model, then=Value(i)) for i, model in enumerate(custom_order)],
+        default=Value(len(custom_order)),
+        output_field=IntegerField()
+    )
+
+    permissions = Permission.objects.filter(
+        content_type__app_label='application'
+    ).annotate(custom_order=order_case).order_by('custom_order', 'content_type__model', 'codename')
+
+    # Pre-select permissions already assigned to this group
+    form.fields['permissions'].initial = group.permissions.all()
+
+    return render(request, 'application/edit_role.html', {
+        'form': form,
+        'group': group,
+        'permissions': permissions,
+    })
+
+@login_required
+@superuser_or_special_required
+def delete_role(request, group_id):
+    if not has_permission(request.user, 'auth.change_group'):
+        return JsonResponse({'success': False, 'error': 'Permission denied'})
+    
+    if request.method == 'POST':
+        group = get_object_or_404(Group, id=group_id)
+        group.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False})
+
+@login_required
+def get_batch_franchise(request, batch_id):
+    """Get franchise ID for a batch"""
+    if not has_permission(request.user, 'view_franchise'):
+        return JsonResponse({'error': 'Permission denied'}, status=403)
+    
+    try:
+        batch = Batch.objects.get(id=batch_id)
+        return JsonResponse({'franchise_id': str(batch.franchise.id)})
+    except Batch.DoesNotExist:
+        return JsonResponse({'error': 'Batch not found'}, status=404)

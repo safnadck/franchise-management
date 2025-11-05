@@ -1,4 +1,5 @@
 {% load static %}
+{% load permission_tags %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,85 +8,88 @@
   <title>Franchise Report</title>
   <link rel="stylesheet" href="{% static 'css/franchise_report.css' %}">
   <script src="https://code.iconify.design/3/3.1.0/iconify.min.js"></script>
-  </style>
 </head>
 <body>
-
-
   <header class="navbar">
     <a href="{% url 'application:homepage' %}" class="navbar-left">
       <img src="{% static 'images/tutorlogo.png' %}" alt="Tutor Logo" class="brand-logo">
     </a>
-
     
-   <div class="user-panel">
-  <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
-  <span class="user-name">{{ user.username }}</span>
-
-
-  <div class="dropdown-menu">
-    <a href="{% url 'logout' %}" class="logout-link">Logout</a>
-  </div>
-</div>
- 
-    
+    <div class="user-panel">
+      <span class="iconify profile" data-icon="iconamoon:profile-fill"></span>
+      <span class="user-name">{{ user.username }}</span>
+      <div class="dropdown-menu">
+        <a href="{% url 'application:student_profile' %}" class="profile-link">My Profile</a>
+        <a href="{% url 'logout' %}" class="logout-link">Logout</a>
+      </div>
+    </div>
   </header>
 
   <aside class="sidebar-menu">
     <div class="menu-wrapper">
-      <div class="menu-item">
-        <a href="{% url 'application:franchise_list' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
-          <span class="menu-text">Franchise</span>
-        </a>
-      </div>
-      <div class="menu-item">
-        <a href="{% url 'application:receipt_search' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
-          <span class="menu-text">Reciept</span>
-        </a>
-      </div>
 
-       <div class="menu-item">
-        <a href="{% url 'application:user_register' %}" class="menu-link">
-          <span class="iconify menu-icon" data-icon="ph:student-bold"></span>
-          <span class="menu-text">Registration</span>
-        </a>
-      </div>
-      
+            <!-- Reports Menu -->
+      {% if user|can_access:"view_reports" or user.is_superuser %}
       <div class="menu-item">
         <a href="{% url 'application:homepage' %}" class="menu-link">
           <span class="iconify menu-icon" data-icon="iconoir:reports-solid"></span>
           <span class="menu-text">Reports</span>
         </a>
       </div>
-      <!-- <div class="menu-item">
-        <a href="#" class="menu-link">
-          <span class="iconify menu-icon" data-icon="mdi:cog"></span>
-          <span class="menu-text">Settings</span>
+      {% endif %}
+      
+      <!-- Franchise Menu -->
+      {% if user|can_access:"view_franchise" or user.is_superuser %}
+      <div class="menu-item">
+        <a href="{% url 'application:franchise_list' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fa-solid:school"></span>
+          <span class="menu-text">Franchise</span>
         </a>
-      </div> -->
+      </div>
+      {% endif %}
+
+      <!-- Receipt Menu -->
+      {% if user|can_access:"process_payment" or user.is_superuser %}
+      <div class="menu-item">
+        <a href="{% url 'application:receipt_search' %}" class="menu-link">
+          <span class="iconify menu-icon" data-icon="fluent:reciept-24-filled"></span>
+          <span class="menu-text">Receipt</span>
+        </a>
+      </div>
+      {% endif %}
+
     </div>
   </aside>
 
-
   <main class="page-content">
-
-     <div class="register-wrapper">
+    <div class="register-wrapper">
       <div class="left-buttons">
         <a href="{% url 'application:franchise_list' %}" class="backbutton">
           <span class="iconify" data-icon="weui:back-filled" style="font-size: 20px;"></span>
         </a>
+           <button class="sidebar-toggle">
+      <span class="iconify" data-icon="mdi:menu" style="font-size: 20px;"></span>
+        </button>
       </div>
-      
 
+      <div class="search-wrapper">
+        <form method="get" class="search-form">
+          <input type="text" name="search" value="{{ search_query }}" placeholder="Search batches..." class="search-input">
+          <button type="submit" class="search-button">
+            <span class="iconify" data-icon="mdi:magnify" style="font-size: 20px;"></span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Only show Add Batch button if user has permission -->
+      {% if user|can_access:"add_batch" or user.is_superuser %}
       <div class="right-buttons">
-
         <a href="{% url 'application:batch_create' franchise.pk %}" class="register-button">
           <span class="iconify plus-icon" data-icon="vaadin:plus"></span>
-          Add batch
+          Add Batch
         </a>
       </div>
+      {% endif %}
     </div>
 
     <!-- Franchise Details Section -->
@@ -123,13 +127,12 @@
     <div class="table-wrapper">
       {% if batches %}
       <table class="data-table">
-<thead>
+        <thead>
           <tr>
             <th>Batch Number</th>
             <th>Course</th>
             <th>Fees</th>
-            <th>actions</th>
-            
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -139,12 +142,13 @@
             <td>{{ batch.course.display_name|default:batch.course.id }}</td>
             <td>{{ batch.fees }}</td>
             <td>
-                <a href="{% url 'application:batch_students' franchise.pk batch.pk %}" class="btnview">
-            View
-          </a>
-                <!-- <a href="{% url 'application:batch_fee_management' franchise.pk batch.pk %}" class="btnview">
-            Fee Management
-          </a> -->
+              <!-- View Students button - show if user can view students -->
+              {% if user|can_access:"view_userfranchise" or user.is_superuser %}
+              <a href="{% url 'application:batch_students' franchise.pk batch.pk %}" class="btnview">
+                View
+              </a>
+              {% endif %}
+
             </td>
           </tr>
           {% endfor %}
@@ -154,23 +158,36 @@
       <p>No batches registered yet.</p>
       {% endif %}
     </div>
-
   </main>
-<script>
-  const userPanel = document.querySelector('.user-panel');
-  const dropdownMenu = document.querySelector('.dropdown-menu');
 
-  // Toggle dropdown on click
-  userPanel.addEventListener('click', function(event) {
-    event.stopPropagation(); // prevent click from bubbling
-    dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
-  });
+  <script>
+    const userPanel = document.querySelector('.user-panel');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+    const sidebar = document.querySelector('.sidebar-menu');
+    const toggleButton = document.querySelector('.sidebar-toggle');
 
-  // Close dropdown when clicking outside
-  document.addEventListener('click', function() {
-    dropdownMenu.style.display = 'none';
-  });
-</script>
 
+    // Toggle dropdown on click
+    userPanel.addEventListener('click', function(event) {
+      event.stopPropagation(); // prevent click from bubbling
+      dropdownMenu.style.display = dropdownMenu.style.display === 'block' ? 'none' : 'block';
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function() {
+      dropdownMenu.style.display = 'none';
+    });
+
+     // Toggle sidebar on button click
+    toggleButton.addEventListener('click', function() {
+      sidebar.classList.toggle('sidebar-open');
+      const icon = toggleButton.querySelector('.iconify');
+      if (sidebar.classList.contains('sidebar-open')) {
+        icon.setAttribute('data-icon', 'mdi:close');
+      } else {
+        icon.setAttribute('data-icon', 'mdi:menu');
+      }
+    });
+  </script>
 </body>
 </html>

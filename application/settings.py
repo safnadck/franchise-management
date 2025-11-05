@@ -44,6 +44,16 @@ LOCALE_PATHS = [
     root('application', 'conf', 'locale'),
 ]
 
+
+DEBUG = True
+
+# Email settings are handled by the main Open edX application
+# Do not override here to ensure compatibility with production email setup
+
+
+ALLOWED_HOSTS = []
+
+
 ROOT_URLCONF = 'application.urls'
 
 SECRET_KEY = 'insecure-secret-key'
@@ -60,3 +70,8 @@ STATIC_URL = '/static/'
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'application', 'static'),
 ]
+
+
+# -------------------
+# EMAIL CONFIGURATION
+# -------------------

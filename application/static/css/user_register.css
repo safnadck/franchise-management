@@ -94,7 +94,7 @@ body {
 /* Sidebar */
 .sidebar-menu {
   position: fixed;
-  top: 115px;
+  top: 125px;
   left: 15px;
   width: 80px;
   height: calc(100vh - 70px);
@@ -104,7 +104,7 @@ body {
 
 }
 
-.sidebar-menu:hover {
+.sidebar-menu.sidebar-open {
   width: 250px;
 }
 
@@ -127,7 +127,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 0.6rem;
   text-decoration: none;
   color: #16376D;
   gap: 12px;
@@ -135,8 +135,8 @@ body {
   transition: padding 0.3s ease;
 }
 
-.sidebar-menu:not(:hover) .menu-link {
-  padding: 0.6rem 0.6rem;
+.sidebar-menu.sidebar-open .menu-link {
+  padding: 0.6rem 1rem;
 }
 
 .menu-icon {
@@ -157,22 +157,48 @@ body {
   color: #16376D;
 }
 
-.sidebar-menu:hover .menu-text {
+.sidebar-menu.sidebar-open .menu-text {
   opacity: 1;
 }
+
+.sidebar-toggle {
+  position: fixed;
+  top: 85px;
+  left: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #fff;
+  border: 1px solid #16376D;
+  color: #16376D;
+  padding: 9px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.sidebar-toggle:hover {
+  background-color: #16376D;
+  color: #fff;
+}
+
 
 /* Main content responsive with sidebar */
 .page-content {
   margin-left: 80px;
-  margin-top: 40px;
+  margin-top: 52px;
   padding: 2rem;
   min-height: calc(100vh - 70px);
   transition: margin-left 0.3s ease;
 }
 
-.sidebar-menu:hover ~ .page-content {
+.sidebar-menu.sidebar-open ~ .page-content {
   margin-left: 250px;
 }
+
 
 .heading {
   font-size: 100px;

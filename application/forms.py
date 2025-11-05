@@ -1,9 +1,38 @@
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth.models import User, Group, Permission
 from common.djangoapps.student.models import UserProfile, CourseEnrollment
 from openedx.core.djangoapps.content.course_overviews.models import CourseOverview
-from .models import Franchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, Payment, InstallmentTemplate, CourseFee
+from .models import Franchise, UserFranchise, Batch, BatchFeeManagement, StudentFeeManagement, Installment, Payment, InstallmentTemplate, CourseFee
 
+
+class RoleForm(forms.ModelForm):
+    permissions = forms.ModelMultipleChoiceField(
+        queryset=Permission.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label='Permissions'
+    )
+
+    class Meta:
+        model = Group
+        fields = ['name', 'permissions']
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'Enter role name', 'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter only application permissions
+        self.fields['permissions'].queryset = Permission.objects.filter(
+            content_type__app_label='application'
+        ).order_by('content_type__model', 'codename')
+
+    def save(self, commit=True):
+        group = super().save(commit=False)
+        if commit:
+            group.save()
+            group.permissions.set(self.cleaned_data['permissions'])
+        return group
 
 class FranchiseForm(forms.ModelForm):
     class Meta:
@@ -71,6 +100,9 @@ class FranchiseUserRegistrationForm(forms.ModelForm):
         if not self.instance.pk:
             self.fields['username'].initial = 'temp_username'
 
+        # Filter batches based on selected franchises dynamically
+        # This will be handled by JavaScript in the template
+
 
 class BatchForm(forms.ModelForm):
     discount = forms.DecimalField(
@@ -119,13 +151,14 @@ class StudentFeeManagementForm(forms.ModelForm):
         fields = ['remaining_amount']
 
 
-class StudentDiscountForm(forms.ModelForm):
-    class Meta:
-        model = StudentFeeManagement
-        fields = ['discount']
-        widgets = {
-            'discount': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': 'Discount Amount'}),
-        }
+class StudentDiscountForm(forms.Form):
+    additional_discount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        widget=forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'placeholder': 'Additional Discount Amount'}),
+        label='Additional Discount Amount (₹)'
+    )
 
 
 class InstallmentForm(forms.ModelForm):
@@ -154,6 +187,12 @@ class EditInstallmentForm(forms.ModelForm):
         amount = self.cleaned_data.get('amount')
         if amount is not None and amount <= 0:
             raise forms.ValidationError("Amount must be greater than 0")
+
+        # Check if amount is less than already paid amount
+        payed_amount = self.cleaned_data.get('payed_amount') or self.instance.payed_amount
+        if payed_amount and amount < payed_amount:
+            raise forms.ValidationError(f"Amount cannot be less than the paid amount of ₹{payed_amount}")
+
         return amount
 
     def clean_repayment_period_days(self):
@@ -236,6 +275,19 @@ class SpecialAccessUserRegistrationForm(forms.ModelForm):
     phone = forms.CharField(max_length=20, label='Phone', required=True)
     password = forms.CharField(widget=forms.PasswordInput, label='Password')
     mailing_address = forms.CharField(max_length=255, label='Mailing Address', required=True)
+    group = forms.ModelChoiceField(queryset=Group.objects.all(), label='Group (Role)', required=True)
+    allowed_franchises = forms.ModelMultipleChoiceField(
+        queryset=Franchise.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-control'}),
+        required=False,
+        label='Allowed Franchises'
+    )
+    allowed_batches = forms.ModelMultipleChoiceField(
+        queryset=Batch.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-control'}),
+        required=False,
+        label='Allowed Batches'
+    )
 
     class Meta:
         model = User
@@ -253,6 +305,14 @@ class SpecialAccessUserRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("Username already exists")
         return username
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # Store franchise-batch relationship for template
+        self.batch_franchise_map = {}
+        for batch in Batch.objects.all().select_related('franchise'):
+            self.batch_franchise_map[str(batch.id)] = str(batch.franchise.id)
+
     def save(self, commit=True):
         user = super().save(commit=False)
         name_parts = self.cleaned_data['full_name'].split(' ', 1)
@@ -263,6 +323,7 @@ class SpecialAccessUserRegistrationForm(forms.ModelForm):
 
         if commit:
             user.save()
+            user.groups.add(self.cleaned_data['group'])
 
             profile, created = UserProfile.objects.get_or_create(user=user)
             profile.name = self.cleaned_data['full_name']
@@ -271,3 +332,31 @@ class SpecialAccessUserRegistrationForm(forms.ModelForm):
             profile.save()
 
         return user
+
+
+class EditSpecialAccessUserForm(forms.Form):
+    allowed_franchises = forms.ModelMultipleChoiceField(
+        queryset=Franchise.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-control'}),
+        required=False,
+        label='Allowed Franchises'
+    )
+    allowed_batches = forms.ModelMultipleChoiceField(
+        queryset=Batch.objects.all(),
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-control'}),
+        required=False,
+        label='Allowed Batches'
+    )
+
+    def __init__(self, *args, **kwargs):
+        self.special_access_user = kwargs.pop('special_access_user', None)
+        super().__init__(*args, **kwargs)
+
+        if self.special_access_user:
+            self.fields['allowed_franchises'].initial = self.special_access_user.allowed_franchises.all()
+            self.fields['allowed_batches'].initial = self.special_access_user.allowed_batches.all()
+
+        # Store franchise-batch relationship for template
+        self.batch_franchise_map = {}
+        for batch in Batch.objects.all().select_related('franchise'):
+            self.batch_franchise_map[str(batch.id)] = str(batch.franchise.id)

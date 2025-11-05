@@ -99,7 +99,7 @@ body {
   overflow: hidden;
 }
 
-.sidebar-menu:hover {
+.sidebar-menu.sidebar-open {
   width: 250px;
 }
 
@@ -182,7 +182,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.6rem 1rem;
+  padding: 0.6rem 0.6rem;
   text-decoration: none;
   color: #16376D;
   gap: 12px;
@@ -190,8 +190,8 @@ body {
   transition: padding 0.3s ease;
 }
 
-.sidebar-menu:not(:hover) .menu-link {
-  padding: 0.6rem 0.6rem;
+.sidebar-menu.sidebar-open .menu-link {
+  padding: 0.6rem 1rem;
 }
 
 .menu-icon {
@@ -211,9 +211,34 @@ body {
   transition: opacity 0.3s ease;
 }
 
-.sidebar-menu:hover .menu-text {
+.sidebar-menu.sidebar-open .menu-text {
   opacity: 1;
 }
+
+.sidebar-toggle {
+  position: fixed;
+  top: 85px;
+  left: 35px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: #fff;
+  border: 1px solid #16376D;
+  color: #16376D;
+  padding: 9px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  transition: background-color 0.3s ease;
+  cursor: pointer;
+  z-index: 1001;
+}
+
+.sidebar-toggle:hover {
+  background-color: #16376D;
+  color: #fff;
+}
+
 
 /* Main content */
 .page-content {
@@ -224,9 +249,10 @@ body {
   transition: margin-left 0.3s ease;
 }
 
-.sidebar-menu:hover ~ .page-content {
+.sidebar-menu.sidebar-open ~ .page-content {
   margin-left: 250px;
 }
+
 
 /* Content Sections */
 .form-card {
@@ -311,33 +337,37 @@ body {
   border-bottom: 1px solid #e0e0e0;
   font-size: 14px;
   vertical-align: middle;
-  padding-left: 60px; /* Consistent left padding */
 }
 
 /* Perfect column width distribution */
 .installment-table th:nth-child(1),
 .installment-table td:nth-child(1) {
-  width: 20%;
+  width: 18%; /* Amount */
 }
 
 .installment-table th:nth-child(2),
 .installment-table td:nth-child(2) {
-  width: 15%; /* Repayment Days column */
+  width: 15%; /* Paid Amount */
 }
 
 .installment-table th:nth-child(3),
 .installment-table td:nth-child(3) {
-  width: 25%; /* Due Date column */
+  width: 15%; /* Repayment Days */
 }
 
 .installment-table th:nth-child(4),
 .installment-table td:nth-child(4) {
-  width: 15%; /* Status column */
+  width: 20%; /* Due Date */
 }
 
 .installment-table th:nth-child(5),
 .installment-table td:nth-child(5) {
-  width: 25%; /* Delete column */
+  width: 15%; /* Status */
+}
+
+.installment-table th:nth-child(6),
+.installment-table td:nth-child(6) {
+  width: 17%; /* Delete */
   text-align: center;
 }
 
@@ -351,18 +381,18 @@ body {
 
 /* Input field styling for perfect alignment */
 .installment-table input[type="number"] {
-  width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  width: 120px;
+  padding: 8px 12px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: rgba(22, 55, 109, 0.14);
   font-size: 14px;
-  background-color: white;
 }
 
 .installment-table input[type="number"]:focus {
   outline: none;
   border-color: #16376D;
-  box-shadow: 0 0 0 2px rgba(22, 55, 109, 0.1);
+  box-shadow: 0 0 0 2px rgba(22, 55, 109, 0.2);
 }
 
 /* Ensure text content is properly aligned */
@@ -581,8 +611,9 @@ body {
   background-color: #122d59;
 }
 
+
 /* Responsive design */
-@media screen and (max-width: 768px) {
+@media screen and (max-width: 1104px) {
   .page-content {
     margin-left: 80px;
     padding: 1rem;
